@@ -1,10 +1,12 @@
 import { z } from 'zod';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(3000),
-  MONGO_URI: z.string().url().default('mongodb://localhost:27017/flow'),
-  REDIS_URL: z.string().url().default('redis://localhost:6379'),
+  MONGO_URI: z.string().min(1).default('mongodb://localhost:27017/flow'),
+  REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
   JWT_ACCESS_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
