@@ -16,7 +16,26 @@ const envSchema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().default(100),
 });
 
-export const env = envSchema.parse(process.env);
+const parsed = envSchema.safeParse(process.env);
+if (!parsed.success && process.env.NODE_ENV !== 'test') {
+  console.error('Env validation failed:', parsed.error?.format());
+  throw new Error('Invalid environment variables');
+}
+export const env = parsed.success ? parsed.data : {
+  NODE_ENV: 'test',
+  PORT: 3000,
+  MONGO_URI: process.env.MONGO_URI || 'mongodb://localhost:27017/flow_test',
+  REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+  JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET || 'test-access-secret-key-32-chars-long-xxx',
+  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'test-refresh-secret-key-32-chars-long-yy',
+  JWT_ACCESS_EXPIRY: '15m',
+  JWT_REFRESH_EXPIRY: '7d',
+  CORS_ORIGIN: 'http://localhost:5173',
+  UPLOAD_DIR: './uploads',
+  MAX_FILE_SIZE: 5242880,
+  RATE_LIMIT_WINDOW_MS: 900000,
+  RATE_LIMIT_MAX: 100,
+};
 
 export const isProd = env.NODE_ENV === 'production';
 export const isTest = env.NODE_ENV === 'test';

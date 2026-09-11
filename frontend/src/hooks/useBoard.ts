@@ -102,6 +102,7 @@ export function useBoard() {
     deleteList: async (id: string) => { await listApi.delete(id); deleteList(id); },
     reorderLists: async (listIds: string[]) => { await listApi.reorder(boardId!, listIds); reorderLists(listIds); },
     createCard,
+    addCard: createCard,
     updateCardTitle,
     updateCard: async (cardId: string, data: any) => { await cardApi.update(cardId, data); updateCard(cardId, data); },
     moveCard: moveCardOptimistic,

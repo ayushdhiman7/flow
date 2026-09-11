@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as ctrl from './workspace.controller.js';
-import { authenticate, authorizeWorkspace } from '../../middleware/rbac.js';
+import { authenticate } from '../../middleware/auth.js';
+import { authorizeWorkspace } from '../../middleware/rbac.js';
 import { validate } from '../../middleware/validate.js';
 import { createWorkspaceSchema, updateWorkspaceSchema, inviteMemberSchema, updateMemberSchema, workspaceIdSchema, memberIdSchema } from './workspace.validation.js';
 

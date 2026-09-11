@@ -3,3 +3,4 @@ export { Input } from './Input';
 export { Modal } from './Modal';
 export { Dropdown } from './Dropdown';
 export { Avatar } from './Avatar';
+export { Card } from './Card';

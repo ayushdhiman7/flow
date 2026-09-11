@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { Button, Input, Modal } from '../../components/ui';
 import { ListColumn } from './ListColumn';
 import { useBoard } from '../../hooks/useBoard';
@@ -25,10 +24,10 @@ export function BoardView() {
   const handleDragEnd = async (event: any) => {
     const { active, over } = event;
     setDraggingId(null);
-
     if (over && active.id !== over.id) {
       const oldIndex = lists.findIndex(l => l.id === active.id);
       const newIndex = lists.findIndex(l => l.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return;
       const newLists = arrayMove(lists, oldIndex, newIndex);
       const listIds = newLists.map(l => l.id);
       await reorderLists(listIds);
@@ -55,7 +54,7 @@ export function BoardView() {
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between p-4 border-b dark:border-slate-700">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{currentBoard?.name}</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{currentBoard?.name || 'Board'}</h1>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => setShowCreateList(true)}>
@@ -109,7 +108,8 @@ export function BoardView() {
             <Button variant="ghost" type="button" onClick={() => setShowCreateList(false)}>Cancel</Button>
             <Button type="submit">Add List</Button>
           </div>
-        </form      </Modal>
+        </form>
+      </Modal>
     </div>
   );
 }

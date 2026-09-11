@@ -1,29 +1,31 @@
 import { useState, useEffect, useRef } from 'react';
-import { Button, Avatar, Input, Modal, ScrollArea } from '../ui';
+import { Button, Avatar, Input, Modal } from '../ui';
 import { useChatStore, useUIStore } from '../../store';
+import { useAuthStore } from '../../store/authStore';
 import { chatApi } from '../../api/endpoints';
 import { useSocket } from '../../hooks';
-import { formatRelativeTime, getInitials, classNames } from '../../utils';
+import { formatRelativeTime, classNames } from '../../utils';
 import { SOCKET_EVENTS } from '../../utils/constants';
 
 export function RightSidebar() {
-  const { rightSidebarOpen, setRightSidebarOpen, toggleRightSidebar } = useUIStore();
+  const { rightSidebarOpen } = useUIStore();
   const { channels, currentChannel, messages, hasMoreMessages, nextCursor, isLoading,
-    setChannels, addChannel, setCurrentChannel, setMessages, prependMessages, addMessage, markAsRead, incrementUnread } = useChatStore();
+    addChannel, setCurrentChannel, setMessages, prependMessages, addMessage, markAsRead, incrementUnread } = useChatStore();
   const { user } = useAuthStore();
-  const { socket, isConnected, joinChannel, leaveChannel } = useSocket();
+  const { socket, joinChannel, leaveChannel } = useSocket();
   const [newMessage, setNewMessage] = useState('');
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
-  const [dmUserEmail, setDmUserEmail] = useState('');
+  const [dmUserEmail] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!currentChannel) return;
     const loadMessages = async () => {
       try {
-        const data = await chatApi.getMessages(currentChannel.id);
-        setMessages(data.messages, data.hasMore, data.nextCursor);
+        const res = await chatApi.getMessages(currentChannel.id);
+        const data = res.data as any;
+        setMessages(data.messages || [], data.hasMore || false, data.nextCursor || null);
         markAsRead(currentChannel.id);
       } catch (err) {
         console.error('Failed to load messages:', err);
@@ -31,7 +33,7 @@ export function RightSidebar() {
     };
     loadMessages();
     joinChannel(currentChannel.id);
-    return () => leaveChannel(currentChannel.id);
+    return () => { leaveChannel(currentChannel.id); };
   }, [currentChannel, setMessages, markAsRead, joinChannel, leaveChannel]);
 
   useEffect(() => {
@@ -43,7 +45,7 @@ export function RightSidebar() {
       }
     };
     socket.on(SOCKET_EVENTS.MESSAGE_NEW, handleMessage);
-    return () => socket.off(SOCKET_EVENTS.MESSAGE_NEW, handleMessage);
+    return () => { socket.off(SOCKET_EVENTS.MESSAGE_NEW, handleMessage); };
   }, [socket, addMessage, incrementUnread, currentChannel]);
 
   useEffect(() => {
@@ -53,10 +55,17 @@ export function RightSidebar() {
   const loadMoreMessages = async () => {
     if (!currentChannel || !hasMoreMessages || isLoading || !nextCursor) return;
     try {
-      const data = await chatApi.getMessages(currentChannel.id, nextCursor, 50);
-      prependMessages(data.messages, data.hasMore, data.nextCursor);
+      const res = await chatApi.getMessages(currentChannel.id, nextCursor, 50);
+      const data = res.data as any;
+      prependMessages(data.messages || [], data.hasMore || false, data.nextCursor || null);
     } catch (err) {
       console.error('Failed to load more messages:', err);
+    }
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (e.currentTarget.scrollTop === 0) {
+      loadMoreMessages();
     }
   };
 
@@ -78,7 +87,7 @@ export function RightSidebar() {
     try {
       const workspaceId = getWorkspaceId();
       const res = await chatApi.create(workspaceId, { name: newChannelName, type: 'channel', memberIds: [] });
-      addChannel(res.data.channel);
+      addChannel((res.data as any).channel);
       setShowCreateChannel(false);
       setNewChannelName('');
     } catch (err) {
@@ -91,13 +100,13 @@ export function RightSidebar() {
     try {
       const workspaceId = getWorkspaceId();
       const res = await chatApi.createDM(workspaceId, dmUserEmail);
-      addChannel(res.data.channel);
+      addChannel((res.data as any).channel);
       setShowCreateChannel(false);
-      setDmUserEmail('');
     } catch (err) {
       console.error('Failed to create DM:', err);
     }
   };
+  void handleCreateDM;
 
   function getWorkspaceId() {
     const path = window.location.pathname;
@@ -125,7 +134,7 @@ export function RightSidebar() {
             onClick={() => setCurrentChannel(channel)}
             className={classNames(
               'w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors',
-              currentChannel?.id === channel.id && 'bg-primary-50 dark:bg-primary-900/30'
+              currentChannel?.id === channel.id ? 'bg-primary-50 dark:bg-primary-900/30' : ''
             )}
           >
             <div className={classNames('w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0',
@@ -145,7 +154,7 @@ export function RightSidebar() {
               <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
                 {channel.name || 'Direct Message'}
               </p>
-              {channel.unreadCount > 0 && (
+              {(channel.unreadCount || 0) > 0 && (
                 <span className="text-xs bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300 px-2 py-0.5 rounded-full">
                   {channel.unreadCount}
                 </span>
@@ -156,72 +165,69 @@ export function RightSidebar() {
       </div>
 
       {currentChannel && (
-        <div className="border-t dark:border-slate-700">
-          <div className="p-4">
-            <div className="flex items-center gap-3 mb-4">
-              <div className={classNames('w-10 h-10 rounded-full flex items-center justify-center',
-                currentChannel.type === 'dm' ? 'bg-purple-100 dark:bg-purple-900/30' : 'bg-primary-100 dark:bg-primary-900/30'
-              )}>
-                {currentChannel.type === 'dm' ? (
-                  <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                )}
-              </div>
-              <div>
-                <p className="font-medium text-slate-900 dark:text-white">{currentChannel.name || 'Direct Message'}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {currentChannel.type === 'channel' ? '# Channel' : 'Direct Message'}
-                </p>
-              </div>
+        <div className="border-t dark:border-slate-700 flex flex-col flex-1 min-h-0">
+          <div className="p-4 flex items-center gap-3 border-b dark:border-slate-700">
+            <div className={classNames('w-10 h-10 rounded-full flex items-center justify-center',
+              currentChannel.type === 'dm' ? 'bg-purple-100 dark:bg-purple-900/30' : 'bg-primary-100 dark:bg-primary-900/30'
+            )}>
+              {currentChannel.type === 'dm' ? (
+                <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              )}
             </div>
-
-            <div className="flex-1 min-h-0" onScroll={handleScroll}>
-              <div className="space-y-4 pb-4" ref={messagesEndRef}>
-                {messages.map((message) => (
-                  <div key={message.id} className={classNames('flex gap-2', message.user.id === user?.id && 'flex-row-reverse')}>
-                    <Avatar name={message.user.name} src={message.user.avatar} size="sm" />
-                    <div className={classNames('max-w-[70%]', message.user.id === user?.id && 'text-right')}>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                        {message.user.id === user?.id ? 'You' : message.user.name}
-                        {' '}{formatRelativeTime(message.createdAt)}
-                      </p>
-                      <div className={classNames(
-                        'inline-block px-4 py-2 rounded-2xl text-sm',
-                        message.user.id === user?.id
-                          ? 'bg-primary-600 text-white rounded-tr-none'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-tl-none'
-                      )}>
-                        {message.content}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div>
+              <p className="font-medium text-slate-900 dark:text-white">{currentChannel.name || 'Direct Message'}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {currentChannel.type === 'channel' ? '# Channel' : 'Direct Message'}
+              </p>
             </div>
-
-            <form onSubmit={handleSendMessage} className="p-4 border-t dark:border-slate-700">
-              <div className="flex gap-2">
-                <Input
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
-                  className="flex-1"
-                />
-                <Button type="submit" size="sm" disabled={!newMessage.trim()}>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
-                </Button>
-              </div>
-            </form>
           </div>
-        )}
-      </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4" onScroll={handleScroll}>
+            {messages.map((message) => (
+              <div key={message.id} className={classNames('flex gap-2', message.user.id === user?.id ? 'flex-row-reverse' : '')}>
+                <Avatar name={message.user.name} src={message.user.avatar} size="sm" />
+                <div className={classNames('max-w-[70%]', message.user.id === user?.id ? 'text-right' : '')}>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    {message.user.id === user?.id ? 'You' : message.user.name}
+                    {' '}{formatRelativeTime(message.createdAt)}
+                  </p>
+                  <div className={classNames(
+                    'inline-block px-4 py-2 rounded-2xl text-sm',
+                    message.user.id === user?.id
+                      ? 'bg-primary-600 text-white rounded-tr-none'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-tl-none'
+                  )}>
+                    {message.content}
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <form onSubmit={handleSendMessage} className="p-4 border-t dark:border-slate-700">
+            <div className="flex gap-2">
+              <Input
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1"
+              />
+              <Button type="submit" size="sm" disabled={!newMessage.trim()}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <Modal isOpen={showCreateChannel} onClose={() => setShowCreateChannel(false)} title="New Conversation">
         <div className="space-y-4">
@@ -247,11 +253,4 @@ export function RightSidebar() {
       </Modal>
     </aside>
   );
-}
-
-function handleScroll(e: React.UIEvent<HTMLDivElement>) {
-  const target = e.currentTarget;
-  if (target.scrollTop === 0) {
-    // loadMoreMessages would be called here
-  }
 }

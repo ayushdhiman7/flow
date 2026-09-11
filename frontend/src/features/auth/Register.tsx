@@ -69,7 +69,7 @@ export function Register() {
             type="password"
             placeholder="••••••••"
             error={errors.confirmPassword?.message}
-            {...register('confirmPassword', { required: 'Please confirm your password', validate: (value) => value === password || 'Passwords do not match' } })}
+            {...register('confirmPassword', { required: 'Please confirm your password', validate: (value) => value === password || 'Passwords do not match' })}
           />
 
           <Button type="submit" className="w-full" disabled={isLoading}>

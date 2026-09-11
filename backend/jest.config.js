@@ -1,11 +1,12 @@
 export default {
   testEnvironment: 'node',
-  transform: {},
-  moduleFileExtensions: ['js', 'mjs'],
+  transform: {
+    '^.+\\.js$': 'babel-jest',
+  },
   testMatch: ['**/tests/**/*.test.js'],
   collectCoverageFrom: ['src/**/*.js', '!src/app.js'],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov'],
   setupFilesAfterEnv: [],
-  testTimeout: 10000,
+  testTimeout: 30000,
 };

@@ -60,11 +60,11 @@ export function useSocket() {
     });
 
     return () => {
-      socket.off('connect');
-      socket.off('disconnect');
-      socket.off(SOCKET_EVENTS.MESSAGE_NEW);
-      socket.off(SOCKET_EVENTS.NOTIFICATION_NEW);
-      socket.off(SOCKET_EVENTS.PRESENCE_UPDATE);
+      socket?.off('connect');
+      socket?.off('disconnect');
+      socket?.off(SOCKET_EVENTS.MESSAGE_NEW);
+      socket?.off(SOCKET_EVENTS.NOTIFICATION_NEW);
+      socket?.off(SOCKET_EVENTS.PRESENCE_UPDATE);
     };
   }, [accessToken, addMessage, incrementUnread, currentChannel]);
 

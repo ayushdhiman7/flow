@@ -18,7 +18,7 @@ export function ListColumn({ list, isDragging }: ListColumnProps) {
   const [showEditList, setShowEditList] = useState(false);
   const [editListName, setEditListName] = useState(list.name);
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging: isSortableDragging } = useSortable({ id: list.id });
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: list.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -34,7 +34,8 @@ export function ListColumn({ list, isDragging }: ListColumnProps) {
     setNewCardTitle('');
   };
 
-  const handleUpdateListName = async () => {
+  const handleUpdateListName = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!editListName.trim()) return;
     await updateListName(list.id, editListName.trim());
     setShowEditList(false);
@@ -52,7 +53,7 @@ export function ListColumn({ list, isDragging }: ListColumnProps) {
       style={style}
       className={classNames(
         'w-64 flex-shrink-0 flex flex-col bg-slate-100 dark:bg-slate-800 rounded-xl h-fit max-h-full',
-        isDragging && 'opacity-50'
+        isDragging ? 'opacity-50' : ''
       )}
       {...attributes}
     >
@@ -119,7 +120,8 @@ export function ListColumn({ list, isDragging }: ListColumnProps) {
             <Button variant="ghost" type="button" onClick={() => setShowEditList(false)}>Cancel</Button>
             <Button type="submit">Save</Button>
           </div>
-        </form      </Modal>
+        </form>
+      </Modal>
     </div>
   );
 }

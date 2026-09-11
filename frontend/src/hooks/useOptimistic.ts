@@ -13,16 +13,18 @@ export function useOptimistic<T, R>() {
   const mutate = useCallback(
     async (variables: T, options: OptimisticOptions<T, R>) => {
       let context: R | undefined;
+      let caughtError: Error | null = null;
       try {
         context = await options.onMutate(variables);
         contextRef.current = context;
         const data = await options.onSuccess?.(undefined, variables, context);
         return data;
-      } catch (error) {
-        options.onError?.(error as Error, variables, context!);
-        throw error;
+      } catch (e) {
+        caughtError = e as Error;
+        options.onError?.(caughtError, variables, context!);
+        throw caughtError;
       } finally {
-        options.onSettled?.(undefined, error as Error | null, variables, context!);
+        options.onSettled?.(undefined, caughtError, variables, context!);
       }
     },
     []
