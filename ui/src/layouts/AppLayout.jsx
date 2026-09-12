@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { LayoutDashboard, Kanban, StickyNote, Settings, Calendar, Menu, X, LogOut, Plus, ChevronsUpDown, Building2, Search, Bell, MessageSquare } from "lucide-react";
+import { LayoutDashboard, Kanban, StickyNote, Settings, Calendar, Menu, X, LogOut, Plus, ChevronsUpDown, Building2, Search, Bell, MessageSquare, Moon, Sun } from "lucide-react";
+import { useTheme } from "@/app/ThemeContext.jsx";
 import { selectUser } from "@/features/auth/authSelectors";
 import { logout } from "@/features/auth/authSlice";
 import { selectWorkspaces, selectSelectedWorkspace, selectSelectedWorkspaceId } from "@/features/workspace/workspaceSelectors";
@@ -28,6 +29,7 @@ export default function AppLayout() {
   const selectedId = useSelector(selectSelectedWorkspaceId);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { isDark, toggle } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [wsOpen, setWsOpen] = useState(false);
   const [newWsName, setNewWsName] = useState("");
@@ -44,7 +46,7 @@ export default function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fbfcfe] flex">
+    <div className="min-h-screen bg-[#fbfcfe] dark:bg-zinc-950 flex">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-[280px] border-r border-zinc-200/70 bg-white flex-col shrink-0">
         <div className="h-[64px] px-5 flex items-center gap-3 border-b border-zinc-100">
@@ -151,7 +153,7 @@ export default function AppLayout() {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-[64px] border-b border-zinc-200/60 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 flex items-center gap-4 px-4 lg:px-8 shrink-0 sticky top-0 z-20">
+        <header className="h-[64px] border-b border-zinc-200/60 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-zinc-900/60 flex items-center gap-4 px-4 lg:px-8 shrink-0 sticky top-0 z-20">
           <button className="lg:hidden h-9 w-9 rounded-xl border border-zinc-200 grid place-items-center" onClick={()=>setMobileOpen(true)}><Menu className="h-5 w-5"/></button>
           <div className="flex items-center gap-2 text-sm">
             <span className="hidden sm:inline-flex items-center gap-2 text-zinc-500"><Building2 className="h-4 w-4"/> Workspace</span>
@@ -168,7 +170,10 @@ export default function AppLayout() {
             </div>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <button className="h-9 w-9 rounded-xl border border-zinc-200 bg-white grid place-items-center text-zinc-600 hover:bg-zinc-50"><Bell className="h-4 w-4"/></button>
+            <button onClick={toggle} aria-label="Toggle theme" className="h-9 w-9 rounded-xl border border-zinc-200 bg-white dark:bg-zinc-900 dark:border-zinc-700 grid place-items-center text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+              {isDark ? <Sun className="h-4 w-4"/> : <Moon className="h-4 w-4"/>}
+            </button>
+            <button className="h-9 w-9 rounded-xl border border-zinc-200 bg-white dark:bg-zinc-900 dark:border-zinc-700 grid place-items-center text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50"><Bell className="h-4 w-4"/></button>
             <div className="hidden sm:flex items-center gap-3 pl-3 border-l border-zinc-200">
               <div className="text-right hidden lg:block">
                 <div className="text-sm font-medium leading-none">{user?.name}</div>

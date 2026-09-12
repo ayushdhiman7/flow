@@ -1,5 +1,6 @@
 import Redis from 'ioredis';
 import { env } from './env.js';
+import { logger } from './logger.js';
 
 export const redis = new Redis(env.REDIS_URL, {
   maxRetriesPerRequest: null,
@@ -8,8 +9,8 @@ export const redis = new Redis(env.REDIS_URL, {
   lazyConnect: true,
 });
 
-redis.on('connect', () => console.log('Redis connected'));
-redis.on('error', (err) => console.error('Redis error:', err));
+redis.on('connect', () => logger.info('Redis connected'));
+redis.on('error', (err) => logger.error('Redis error', { message: err.message }));
 
 export async function connectRedis() {
   if (['connect', 'ready', 'connecting'].includes(redis.status)) return;
@@ -42,7 +43,13 @@ export async function setCache(key, value, ttl = 300) {
 
 export async function delCache(pattern) {
   try {
-    const keys = await redis.keys(pattern);
-    if (keys.length) await redis.del(...keys);
-  } catch {}
+    let cursor = '0';
+    do {
+      const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = nextCursor;
+      if (keys.length) await redis.del(...keys);
+    } while (cursor !== '0');
+  } catch (err) {
+    logger.warn('delCache failed', { pattern, error: err.message });
+  }
 }

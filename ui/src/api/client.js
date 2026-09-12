@@ -34,6 +34,8 @@ function getErrorMessage(data, fallback) {
   return fallback;
 }
 
+import { enqueueOfflineRequest } from "@/app/offlineQueue";
+
 export async function apiFetch(path, { method = "GET", body, headers = {}, credentials = "include", ...rest } = {}) {
   const url = `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
 
@@ -55,7 +57,16 @@ export async function apiFetch(path, { method = "GET", body, headers = {}, crede
   try {
     res = await fetch(url, opts);
   } catch (err) {
-    // network error
+    // offline: queue mutating requests
+    const isMutating = !["GET", "HEAD"].includes(method.toUpperCase());
+    if (isMutating && typeof navigator !== "undefined" && !navigator.onLine) {
+      enqueueOfflineRequest(path, { method, body, headers, credentials, ...rest });
+      const error = new Error("You are offline — request queued and will sync when back online.");
+      error.status = 0;
+      error.offlineQueued = true;
+      error.original = err;
+      throw error;
+    }
     const error = new Error("Network error. Please check your connection.");
     error.status = 0;
     error.original = err;

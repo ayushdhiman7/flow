@@ -1,0 +1,219 @@
+openapi: 3.0.0
+info:
+  title: Flow API
+  version: 1.0.0
+  description: Mini SaaS API - Notion/Trello/Slack lite. Generated from JSDoc in src/modules/**/*.routes.js via swagger-jsdoc.
+servers:
+  - url: http://localhost:3000/api
+    description: Development
+  - url: http://localhost:3000
+    description: Production
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: accessToken
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    User:
+      type: object
+      properties:
+        _id: { type: string }
+        name: { type: string }
+        email: { type: string }
+        avatar: { type: string }
+        chatCode: { type: string }
+    Workspace:
+      type: object
+      properties:
+        _id: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        owner: { $ref: '#/components/schemas/User' }
+        members:
+          type: array
+          items:
+            type: object
+            properties:
+              user: { $ref: '#/components/schemas/User' }
+              role: { type: string, enum: [owner, admin, member] }
+    Board:
+      type: object
+      properties:
+        _id: { type: string }
+        name: { type: string }
+        workspace: { type: string }
+        visibility: { type: string, enum: [private, workspace] }
+    List:
+      type: object
+      properties:
+        _id: { type: string }
+        name: { type: string }
+        board: { type: string }
+        position: { type: number }
+    Card:
+      type: object
+      properties:
+        _id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        list: { type: string }
+        board: { type: string }
+        position: { type: number }
+        assignees:
+          type: array
+          items: { type: string }
+security:
+  - cookieAuth: []
+    bearerAuth: []
+paths:
+  /api/auth/register:
+    post:
+      summary: Register new user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string }
+                email: { type: string }
+                password: { type: string }
+      responses:
+        '201': { description: User registered }
+  /api/auth/login:
+    post:
+      summary: Login
+      tags: [Auth]
+      responses: { '200': { description: Login success } }
+  /api/auth/refresh:
+    post:
+      summary: Refresh access token
+      tags: [Auth]
+      responses: { '200': { description: Token refreshed } }
+  /api/auth/logout:
+    post:
+      summary: Logout
+      tags: [Auth]
+      security: [{ cookieAuth: [], bearerAuth: [] }]
+      responses: { '200': { description: Logged out } }
+  /api/auth/me:
+    get:
+      summary: Get current user
+      tags: [Auth]
+      security: [{ cookieAuth: [], bearerAuth: [] }]
+      responses: { '200': { description: Current user } }
+    put:
+      summary: Update profile
+      tags: [Auth]
+      security: [{ cookieAuth: [], bearerAuth: [] }]
+      responses: { '200': { description: Profile updated } }
+  /api/auth/me/avatar:
+    post:
+      summary: Upload avatar
+      tags: [Auth]
+      security: [{ cookieAuth: [], bearerAuth: [] }]
+      responses: { '200': { description: Avatar uploaded } }
+  /api/auth/me/password:
+    put:
+      summary: Change password
+      tags: [Auth]
+      security: [{ cookieAuth: [], bearerAuth: [] }]
+      responses: { '200': { description: Password changed } }
+  /api/auth/by-code/{code}:
+    get:
+      summary: Get user by chat code
+      tags: [Auth]
+      parameters: [{ name: code, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: User found } }
+  /api/workspaces:
+    post: { summary: Create workspace, tags: [Workspaces], security: [{ cookieAuth: [], bearerAuth: [] }], responses: { '201': { description: Created } } }
+    get: { summary: List workspaces (cached), tags: [Workspaces], security: [{ cookieAuth: [], bearerAuth: [] }], responses: { '200': { description: List } } }
+  /api/workspaces/{id}:
+    get: { summary: Get workspace, tags: [Workspaces], parameters: [{ name: id, in: path, required: true, schema: { type: string } }], responses: { '200': { description: Workspace } } }
+    put: { summary: Update workspace (owner), tags: [Workspaces], responses: { '200': { description: Updated } } }
+    delete: { summary: Delete workspace (owner), tags: [Workspaces], responses: { '200': { description: Deleted } } }
+  /api/workspaces/{id}/members:
+    post: { summary: Invite member (admin/owner), tags: [Workspaces], responses: { '200': { description: Invited } } }
+  /api/workspaces/{id}/members/{userId}:
+    put: { summary: Update member role (owner), tags: [Workspaces], responses: { '200': { description: Updated } } }
+    delete: { summary: Remove member, tags: [Workspaces], responses: { '200': { description: Removed } } }
+  /api/workspaces/{workspaceId}/boards:
+    post: { summary: Create board, tags: [Boards], responses: { '201': { description: Created } } }
+    get: { summary: List boards (cached), tags: [Boards], responses: { '200': { description: List } } }
+  /api/workspaces/{workspaceId}/boards/{id}:
+    get: { summary: Get board, tags: [Boards], responses: { '200': { description: Board } } }
+    put: { summary: Update board (admin/owner), tags: [Boards], responses: { '200': { description: Updated } } }
+    delete: { summary: Delete board (admin/owner), tags: [Boards], responses: { '200': { description: Deleted } } }
+  /api/workspaces/{workspaceId}/boards/{id}/full:
+    get: { summary: Get board with lists and cards (aggregation, cached), tags: [Boards], responses: { '200': { description: Full board } } }
+  /api/workspaces/{workspaceId}/boards/{id}/stats:
+    get: { summary: Get board stats (aggregation), tags: [Boards], responses: { '200': { description: Stats } } }
+  /api/workspaces/{workspaceId}/boards/{id}/members:
+    post: { summary: Add board member, tags: [Boards], responses: { '200': { description: Added } } }
+  /api/workspaces/{workspaceId}/boards/{id}/members/{userId}:
+    delete: { summary: Remove board member, tags: [Boards], responses: { '200': { description: Removed } } }
+  /api/boards/{boardId}/lists:
+    post: { summary: Create list, tags: [Lists], responses: { '201': { description: Created } } }
+    get: { summary: List lists, tags: [Lists], responses: { '200': { description: List } } }
+  /api/boards/{boardId}/lists/{id}:
+    get: { summary: Get list, tags: [Lists], responses: { '200': { description: List } } }
+    put: { summary: Update list (admin/owner), tags: [Lists], responses: { '200': { description: Updated } } }
+    delete: { summary: Delete list (admin/owner), tags: [Lists], responses: { '200': { description: Deleted } } }
+  /api/boards/{boardId}/lists/reorder:
+    post: { summary: Reorder lists (transaction), tags: [Lists], responses: { '200': { description: Reordered } } }
+  /api/lists/{listId}/cards:
+    post: { summary: Create card, tags: [Cards], responses: { '201': { description: Created } } }
+    get:
+      summary: List cards (paginated, $text + regex fallback search)
+      tags: [Cards]
+      parameters:
+        - { name: listId, in: path, required: true, schema: { type: string } }
+        - { name: search, in: query, schema: { type: string }, description: Search title/description via text index + regex fallback }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer } }
+      responses: { '200': { description: List } }
+  /api/lists/{listId}/cards/{id}:
+    get: { summary: Get card, tags: [Cards], responses: { '200': { description: Card } } }
+    put: { summary: Update card (admin/owner), tags: [Cards], responses: { '200': { description: Updated } } }
+    delete: { summary: Delete card (admin/owner), tags: [Cards], responses: { '200': { description: Deleted } } }
+  /api/lists/{listId}/cards/{id}/move:
+    patch: { summary: Move card (transaction), tags: [Cards], responses: { '200': { description: Moved } } }
+  /api/lists/{listId}/cards/{id}/assignees:
+    post: { summary: Add assignees, tags: [Cards], responses: { '200': { description: Added } } }
+  /api/lists/{listId}/cards/{id}/assignees/{assigneeId}:
+    delete: { summary: Remove assignee, tags: [Cards], responses: { '200': { description: Removed } } }
+  /api/workspaces/{workspaceId}/channels:
+    post: { summary: Create channel, tags: [Chat], responses: { '201': { description: Created } } }
+    get: { summary: List channels, tags: [Chat], responses: { '200': { description: List } } }
+  /api/workspaces/{workspaceId}/channels/dm:
+    post: { summary: Create DM by userId, tags: [Chat], responses: { '200': { description: DM created } } }
+  /api/workspaces/{workspaceId}/channels/dm-by-code:
+    post: { summary: Create DM by chat code, tags: [Chat], responses: { '200': { description: DM created } } }
+  /api/workspaces/{workspaceId}/channels/{id}:
+    get: { summary: Get channel, tags: [Chat], responses: { '200': { description: Channel } } }
+  /api/workspaces/{workspaceId}/channels/{id}/messages:
+    get: { summary: Get messages (cursor), tags: [Chat], responses: { '200': { description: Messages } } }
+    post: { summary: Send message, tags: [Chat], responses: { '201': { description: Message sent } } }
+  /api/workspaces/{workspaceId}/notes:
+    post: { summary: Create note, tags: [Notes], responses: { '201': { description: Created } } }
+    get:
+      summary: List notes (text search)
+      tags: [Notes]
+      parameters:
+        - { name: workspaceId, in: path, required: true, schema: { type: string } }
+        - { name: search, in: query, schema: { type: string } }
+      responses: { '200': { description: Notes } }
+  /api/workspaces/{workspaceId}/notes/{id}:
+    get: { summary: Get note, tags: [Notes], responses: { '200': { description: Note } } }
+    put: { summary: Update note, tags: [Notes], responses: { '200': { description: Updated } } }
+    delete: { summary: Delete note, tags: [Notes], responses: { '200': { description: Deleted } } }
+  /health:
+    get: { summary: Health check, tags: [Health], responses: { '200': { description: OK } } }

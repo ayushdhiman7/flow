@@ -47,6 +47,15 @@ export const cardIdSchema = z.object({
   params: z.object({ id: z.string().regex(/^[0-9a-fA-F]{24}$/) }),
 });
 
+export const getCardsSchema = z.object({
+  params: z.object({ listId: z.string().regex(/^[0-9a-fA-F]{24}$/) }),
+  query: z.object({
+    search: z.string().max(100).optional(),
+    cursor: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
+    limit: z.coerce.number().min(1).max(100).optional(),
+  }).optional(),
+});
+
 export const commentIdSchema = z.object({
   params: z.object({
     id: z.string().regex(/^[0-9a-fA-F]{24}$/),

@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { signUp, clearError } from "@/features/auth/authSlice";
 import { selectAuthLoading, selectAuthError } from "@/features/auth/authSelectors";
 import { Button } from "@/components/ui/button";
@@ -9,64 +12,39 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+const signUpSchema = z.object({
+  name: z.string().min(1, "Name is required").min(2, "Name must be at least 2 characters").max(50, "Name must be at most 50 characters").trim(),
+  email: z.string().min(1, "Email is required").email("Enter a valid email address"),
+  password: z.string().min(1, "Password is required").min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string().min(1, "Please confirm your password"),
+}).refine((data) => data.password === data.confirmPassword, { path: ["confirmPassword"], message: "Passwords do not match" });
+
 export default function SignUpForm() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const loading = useSelector(selectAuthLoading);
   const serverError = useSelector(selectAuthError);
 
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-  });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState({});
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
+    mode: "onBlur",
+  });
 
-  const handleChange = (field) => (e) => {
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
-    // clear field error on change
-    if (fieldErrors[field]) setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
-  };
-
-  const validate = () => {
-    const errors = {};
-    if (!form.name.trim()) errors.name = "Name is required";
-    else if (form.name.trim().length < 2) errors.name = "Name must be at least 2 characters";
-    else if (form.name.trim().length > 50) errors.name = "Name must be at most 50 characters";
-
-    if (!form.email.trim()) errors.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = "Enter a valid email address";
-
-    if (!form.password) errors.password = "Password is required";
-    else if (form.password.length < 8) errors.password = "Password must be at least 8 characters";
-
-    if (!form.confirmPassword) errors.confirmPassword = "Please confirm your password";
-    else if (form.password !== form.confirmPassword) errors.confirmPassword = "Passwords do not match";
-
-    setFieldErrors(errors);
-    return Object.keys(errors).filter((k) => errors[k]).length === 0;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
+  const onSubmit = async (data) => {
     if (serverError) dispatch(clearError());
-
     const result = await dispatch(
-      signUp({ name: form.name.trim(), email: form.email.trim(), password: form.password })
+      signUp({ name: data.name.trim(), email: data.email.trim(), password: data.password })
     );
-
     if (signUp.fulfilled.match(result)) {
-      // backend auto-authenticates, so go to onboarding
       navigate("/onboarding", { replace: true });
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
       {serverError && (
         <Alert variant="destructive" className="py-3">
           <AlertCircle className="h-4 w-4" />
@@ -80,12 +58,11 @@ export default function SignUpForm() {
           id="name"
           type="text"
           placeholder="Jane Doe"
-          value={form.name}
-          onChange={handleChange("name")}
-          aria-invalid={!!fieldErrors.name}
+          {...register("name")}
+          aria-invalid={!!errors.name}
           autoComplete="name"
         />
-        {fieldErrors.name && <p className="text-sm text-destructive">{fieldErrors.name}</p>}
+        {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
       </div>
 
       <div className="space-y-2">
@@ -94,12 +71,11 @@ export default function SignUpForm() {
           id="email"
           type="email"
           placeholder="you@example.com"
-          value={form.email}
-          onChange={handleChange("email")}
-          aria-invalid={!!fieldErrors.email}
+          {...register("email")}
+          aria-invalid={!!errors.email}
           autoComplete="email"
         />
-        {fieldErrors.email && <p className="text-sm text-destructive">{fieldErrors.email}</p>}
+        {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
       </div>
 
       <div className="space-y-2">
@@ -109,9 +85,8 @@ export default function SignUpForm() {
             id="password"
             type={showPassword ? "text" : "password"}
             placeholder="••••••••"
-            value={form.password}
-            onChange={handleChange("password")}
-            aria-invalid={!!fieldErrors.password}
+            {...register("password")}
+            aria-invalid={!!errors.password}
             autoComplete="new-password"
             className="pr-10"
           />
@@ -125,8 +100,8 @@ export default function SignUpForm() {
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
-        {fieldErrors.password ? (
-          <p className="text-sm text-destructive">{fieldErrors.password}</p>
+        {errors.password ? (
+          <p className="text-sm text-destructive">{errors.password.message}</p>
         ) : (
           <p className="text-xs text-muted-foreground">Minimum 8 characters</p>
         )}
@@ -139,9 +114,8 @@ export default function SignUpForm() {
             id="confirmPassword"
             type={showConfirm ? "text" : "password"}
             placeholder="••••••••"
-            value={form.confirmPassword}
-            onChange={handleChange("confirmPassword")}
-            aria-invalid={!!fieldErrors.confirmPassword}
+            {...register("confirmPassword")}
+            aria-invalid={!!errors.confirmPassword}
             autoComplete="new-password"
             className="pr-10"
           />
@@ -155,8 +129,8 @@ export default function SignUpForm() {
             {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
-        {fieldErrors.confirmPassword && (
-          <p className="text-sm text-destructive">{fieldErrors.confirmPassword}</p>
+        {errors.confirmPassword && (
+          <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>
         )}
       </div>
 

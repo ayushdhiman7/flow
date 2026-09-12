@@ -4,10 +4,12 @@ import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
+import morgan from 'morgan';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 
 import { env, connectDB, connectRedis, disconnectDB, disconnectRedis, closeQueues, isTest } from './config/index.js';
+import { logger, stream } from './config/logger.js';
 import { errorHandler, notFound } from './middleware/error.js';
 import { authenticate, optionalAuth } from './middleware/auth.js';
 import { auditLog } from './middleware/audit.js';
@@ -24,6 +26,12 @@ import { initSocket } from './socket/socket.js';
 import './jobs/index.js';
 
 const app = express();
+
+// Structured logging - skip health checks to reduce noise
+app.use(morgan(isTest ? 'tiny' : 'combined', {
+  stream,
+  skip: (req) => req.url === '/health' || req.url === '/api-docs',
+}));
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
@@ -85,8 +93,8 @@ export async function startServer() {
   await connectRedis();
 
   server = app.listen(env.PORT, () => {
-    console.log(`Server running on port ${env.PORT}`);
-    console.log(`API docs: http://localhost:${env.PORT}/api-docs`);
+    logger.info(`Server running on port ${env.PORT}`);
+    logger.info(`API docs: http://localhost:${env.PORT}/api-docs`);
   });
 
   initSocket(server);

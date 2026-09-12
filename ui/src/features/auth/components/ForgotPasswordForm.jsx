@@ -1,43 +1,31 @@
-import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
 import { Loader2, AlertCircle, CheckCircle2, Info } from "lucide-react";
-import { forgotPassword, clearForgotPasswordState } from "@/features/auth/authSlice";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { forgotPassword } from "@/features/auth/authSlice";
 import { selectForgotPassword } from "@/features/auth/authSelectors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+const forgotSchema = z.object({
+  email: z.string().min(1, "Email is required").email("Enter a valid email address"),
+});
+
 export default function ForgotPasswordForm() {
   const dispatch = useDispatch();
   const { loading, error, success, message } = useSelector(selectForgotPassword);
-  const [email, setEmail] = useState("");
-  const [fieldError, setFieldError] = useState("");
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    resolver: zodResolver(forgotSchema),
+    defaultValues: { email: "" },
+    mode: "onBlur",
+  });
 
-  const validate = () => {
-    if (!email.trim()) {
-      setFieldError("Email is required");
-      return false;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setFieldError("Enter a valid email address");
-      return false;
-    }
-    setFieldError("");
-    return true;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-    await dispatch(forgotPassword({ email: email.trim() }));
-  };
-
-  const handleChange = (e) => {
-    setEmail(e.target.value);
-    if (fieldError) setFieldError("");
-    if (error) dispatch(clearForgotPasswordState());
+  const onSubmit = async (data) => {
+    await dispatch(forgotPassword({ email: data.email.trim() }));
   };
 
   if (success) {
@@ -57,7 +45,7 @@ export default function ForgotPasswordForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
       {/* Info about backend status */}
       <Alert className="bg-muted/50">
         <Info className="h-4 w-4" />
@@ -79,13 +67,12 @@ export default function ForgotPasswordForm() {
           id="email"
           type="email"
           placeholder="you@example.com"
-          value={email}
-          onChange={handleChange}
-          aria-invalid={!!fieldError}
+          {...register("email")}
+          aria-invalid={!!errors.email}
           autoComplete="email"
           autoFocus
         />
-        {fieldError && <p className="text-sm text-destructive">{fieldError}</p>}
+        {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
         <p className="text-xs text-muted-foreground">Enter your account email to receive a reset link.</p>
       </div>
 

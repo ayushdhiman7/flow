@@ -6,6 +6,9 @@ import { hydrateForUser } from "@/features/onboarding/onboardingSlice";
 import AppRoutes from "@/routes/AppRoutes";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Loader2 } from "lucide-react";
+import OfflineBanner from "@/components/OfflineBanner";
+import { setupOfflineSync } from "@/app/offlineQueue";
+import { apiFetch } from "@/api/client";
 
 export default function App() {
   const dispatch = useDispatch();
@@ -15,6 +18,10 @@ export default function App() {
   useEffect(() => {
     dispatch(initializeAuth());
   }, [dispatch]);
+
+  useEffect(() => {
+    setupOfflineSync(apiFetch);
+  }, []);
 
   useEffect(() => {
     const uid = user?._id || user?.id;
@@ -34,6 +41,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
+      <OfflineBanner />
       <AppRoutes />
     </ErrorBoundary>
   );

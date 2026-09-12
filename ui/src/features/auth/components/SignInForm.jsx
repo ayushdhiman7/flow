@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn, clearError } from "@/features/auth/authSlice";
 import { selectAuthLoading, selectAuthError } from "@/features/auth/authSelectors";
 import { Button } from "@/components/ui/button";
@@ -9,40 +12,34 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+const signInSchema = z.object({
+  email: z.string().min(1, "Email is required").email("Enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
 export default function SignInForm() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const loading = useSelector(selectAuthLoading);
   const serverError = useSelector(selectAuthError);
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState({});
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    resolver: zodResolver(signInSchema),
+    defaultValues: { email: "", password: "" },
+    mode: "onBlur",
+  });
 
-  const validate = () => {
-    const errors = {};
-    if (!email.trim()) errors.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Enter a valid email address";
-    if (!password) errors.password = "Password is required";
-    else if (password.length < 1) errors.password = "Password is required";
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-    // clear previous server error on new submit
+  const onSubmit = async (data) => {
     if (serverError) dispatch(clearError());
-    const result = await dispatch(signIn({ email: email.trim(), password }));
+    const result = await dispatch(signIn({ email: data.email.trim(), password: data.password }));
     if (signIn.fulfilled.match(result)) {
       navigate("/onboarding", { replace: true });
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
       {serverError && (
         <Alert variant="destructive" className="py-3">
           <AlertCircle className="h-4 w-4" />
@@ -56,15 +53,14 @@ export default function SignInForm() {
           id="email"
           type="email"
           placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          aria-invalid={!!fieldErrors.email}
-          aria-describedby={fieldErrors.email ? "email-error" : undefined}
+          {...register("email")}
+          aria-invalid={!!errors.email}
+          aria-describedby={errors.email ? "email-error" : undefined}
           autoComplete="email"
           autoFocus
         />
-        {fieldErrors.email && (
-          <p id="email-error" className="text-sm text-destructive">{fieldErrors.email}</p>
+        {errors.email && (
+          <p id="email-error" className="text-sm text-destructive">{errors.email.message}</p>
         )}
       </div>
 
@@ -80,10 +76,9 @@ export default function SignInForm() {
             id="password"
             type={showPassword ? "text" : "password"}
             placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            aria-invalid={!!fieldErrors.password}
-            aria-describedby={fieldErrors.password ? "password-error" : undefined}
+            {...register("password")}
+            aria-invalid={!!errors.password}
+            aria-describedby={errors.password ? "password-error" : undefined}
             autoComplete="current-password"
             className="pr-10"
           />
@@ -97,8 +92,8 @@ export default function SignInForm() {
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
-        {fieldErrors.password && (
-          <p id="password-error" className="text-sm text-destructive">{fieldErrors.password}</p>
+        {errors.password && (
+          <p id="password-error" className="text-sm text-destructive">{errors.password.message}</p>
         )}
       </div>
 

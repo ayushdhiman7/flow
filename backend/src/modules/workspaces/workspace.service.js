@@ -2,6 +2,8 @@ import { Workspace } from './workspace.model.js';
 import { User } from '../auth/index.js';
 import { AppError } from '../../middleware/error.js';
 import { generateSlug } from '../../utils/helpers.js';
+import { cacheKey, getCache, setCache, delCache } from '../../config/redis.js';
+import { CACHE_TTL } from '../../utils/constants.js';
 
 export async function createWorkspace(ownerId, data) {
   const existing = await Workspace.findOne({ slug: data.slug });
@@ -15,25 +17,50 @@ export async function createWorkspace(ownerId, data) {
   });
 
   await User.findByIdAndUpdate(ownerId, { $addToSet: { workspaces: workspace._id } });
+  await invalidateWorkspaceCache([ownerId]);
   return workspace;
 }
 
 export async function getWorkspaces(userId) {
-  return Workspace.find({ 'members.user': userId })
+  const key = cacheKey('workspaces', userId);
+  const cached = await getCache(key);
+  if (cached) return cached;
+  const data = await Workspace.find({ 'members.user': userId })
     .populate('owner', 'name email avatar')
     .populate('members.user', 'name email avatar role')
     .sort({ createdAt: -1 });
+  await setCache(key, data, CACHE_TTL.MEDIUM);
+  return data;
+}
+
+async function invalidateWorkspaceCache(userIds = []) {
+  if (!userIds.length) {
+    await delCache(cacheKey('workspaces', '*'));
+    return;
+  }
+  for (const uid of userIds) {
+    await delCache(cacheKey('workspaces', uid));
+  }
 }
 
 export async function getWorkspaceById(workspaceId, userId) {
+  const key = cacheKey('workspace', workspaceId);
+  const cached = await getCache(key);
+  if (cached) {
+    const isMemberCached = cached.members?.some(m => {
+      const uid = m.user?._id?.toString() || m.user?.toString();
+      return uid === userId;
+    });
+    if (!isMemberCached) throw new AppError('Not a member of this workspace', 403);
+    return cached;
+  }
   const workspace = await Workspace.findById(workspaceId)
     .populate('owner', 'name email avatar')
     .populate('members.user', 'name email avatar role');
   if (!workspace) throw new AppError('Workspace not found', 404);
-
   const isMember = workspace.members.some(m => m.user._id.toString() === userId);
   if (!isMember) throw new AppError('Not a member of this workspace', 403);
-
+  await setCache(key, workspace, CACHE_TTL.SHORT);
   return workspace;
 }
 
@@ -48,6 +75,9 @@ export async function updateWorkspace(workspaceId, userId, data) {
 
   Object.assign(workspace, data);
   await workspace.save();
+  const memberIds = workspace.members.map(m => m.user.toString());
+  await invalidateWorkspaceCache(memberIds);
+  await delCache(cacheKey('workspace', workspaceId));
   return workspace;
 }
 
@@ -59,8 +89,11 @@ export async function deleteWorkspace(workspaceId, userId) {
     throw new AppError('Only owner can delete workspace', 403);
   }
 
+  const memberIdsDel = workspace.members.map(m => m.user.toString());
   await workspace.deleteOne();
   await User.updateMany({ workspaces: workspaceId }, { $pull: { workspaces: workspaceId } });
+  await invalidateWorkspaceCache(memberIdsDel);
+  await delCache(cacheKey('workspace', workspaceId));
 }
 
 export async function inviteMember(workspaceId, userId, data) {
@@ -86,6 +119,10 @@ export async function inviteMember(workspaceId, userId, data) {
   await workspace.save();
 
   await User.findByIdAndUpdate(user._id, { $addToSet: { workspaces: workspaceId } });
+  const allIdsInvite = workspace.members.map(m => m.user.toString());
+  allIdsInvite.push(user._id.toString());
+  await invalidateWorkspaceCache([...new Set(allIdsInvite)]);
+  await delCache(cacheKey('workspace', workspaceId));
   return workspace;
 }
 
@@ -104,6 +141,8 @@ export async function updateMember(workspaceId, userId, targetUserId, role) {
   if (target.role === 'owner') throw new AppError('Cannot change owner role', 403);
   target.role = role;
   await workspace.save();
+  await invalidateWorkspaceCache([targetUserId]);
+  await delCache(cacheKey('workspace', workspaceId));
   return workspace;
 }
 
@@ -128,6 +167,8 @@ export async function removeMember(workspaceId, userId, targetUserId) {
   await workspace.save();
 
   await User.findByIdAndUpdate(targetUserId, { $pull: { workspaces: workspaceId } });
+  await invalidateWorkspaceCache([targetUserId, ...workspace.members.map(m => m.user.toString())]);
+  await delCache(cacheKey('workspace', workspaceId));
   return workspace;
 }
 

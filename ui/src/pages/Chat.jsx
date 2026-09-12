@@ -124,7 +124,14 @@ export default function ChatPage() {
           </div>
         ) : (
           <>
-            <MessageList messages={msgState.items} loading={msgState.loading} hasMore={msgState.hasMore} onLoadMore={handleLoadMore} onReply={setReplyTo} />
+            <MessageList
+              messages={msgState.items}
+              loading={msgState.loading}
+              hasMore={msgState.hasMore}
+              onLoadMore={handleLoadMore}
+              onReply={setReplyTo}
+              currentUserId={user?._id || user?.id}
+            />
             <MessageInput onSend={handleSend} sending={false} replyTo={replyTo} onCancelReply={()=>setReplyTo(null)} />
           </>
         )}

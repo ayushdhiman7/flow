@@ -12,7 +12,8 @@ export async function getCards(req, res, next) {
   try {
     const cursor = req.query.cursor;
     const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-    const data = await svc.getCards(req.params.listId, req.user.id, cursor, limit);
+    const search = req.query.search;
+    const data = await svc.getCards(req.params.listId, req.user.id, cursor, limit, search);
     res.json(data);
   } catch (err) { next(err); }
 }

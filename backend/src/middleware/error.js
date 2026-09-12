@@ -1,9 +1,10 @@
 import { env } from '../config/env.js';
 import { ZodError } from 'zod';
 import mongoose from 'mongoose';
+import { logger } from '../config/logger.js';
 
 export function errorHandler(err, req, res, next) {
-  console.error('Error:', err);
+  logger.error(`${req.method} ${req.path} - ${err.message}`, { stack: err.stack, status: err.status || 500 });
 
   if (err instanceof ZodError) {
     return res.status(400).json({

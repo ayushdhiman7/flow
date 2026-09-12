@@ -3,8 +3,18 @@ import { List } from '../lists/list.model.js';
 import { Workspace } from '../workspaces/workspace.model.js';
 import { AppError } from '../../middleware/error.js';
 import { getMemberRole } from '../workspaces/workspace.service.js';
+import { cacheKey, getCache, setCache, delCache } from '../../config/redis.js';
+import { CACHE_TTL } from '../../utils/constants.js';
 
 const DEFAULT_LISTS = ['To Do', 'In Progress', 'Done'];
+
+async function invalidateBoardCache(workspaceId, boardId) {
+  if (workspaceId) await delCache(cacheKey('boards', workspaceId, '*'));
+  if (boardId) {
+    await delCache(cacheKey('board', boardId, '*'));
+    await delCache(cacheKey('board', boardId.toString(), '*'));
+  }
+}
 
 export async function createBoard(workspaceId, userId, data) {
   const workspace = await Workspace.findById(workspaceId);
@@ -33,6 +43,7 @@ export async function createBoard(workspaceId, userId, data) {
     board.lists = lists.map(l => l._id);
     await board.save({ session });
     await session.commitTransaction();
+    await delCache(cacheKey('boards', workspaceId, '*'));
     return board;
   } catch (e) {
     await session.abortTransaction();
@@ -45,7 +56,9 @@ export async function createBoard(workspaceId, userId, data) {
 export async function getBoards(workspaceId, userId) {
   const role = await getMemberRole(workspaceId, userId);
   if (!role) throw new AppError('Not a member of this workspace', 403);
-
+  const key = cacheKey('boards', workspaceId, userId);
+  const cached = await getCache(key);
+  if (cached) return cached;
   const query = { workspace: workspaceId };
   if (role === 'member') {
     query.$or = [
@@ -54,11 +67,12 @@ export async function getBoards(workspaceId, userId) {
       { createdBy: userId },
     ];
   }
-
-  return Board.find(query)
+  const data = await Board.find(query)
     .populate('createdBy', 'name email avatar')
     .populate('members', 'name email avatar')
     .sort({ updatedAt: -1 });
+  await setCache(key, data, CACHE_TTL.SHORT);
+  return data;
 }
 
 export async function getBoardById(boardId, userId) {
@@ -79,11 +93,10 @@ export async function getBoardById(boardId, userId) {
 }
 
 export async function getBoardFull(boardId, userId) {
+  const key = cacheKey('board', boardId, 'full', userId);
+  const cached = await getCache(key);
+  if (cached) return cached;
   const board = await getBoardById(boardId, userId);
-
-  const lists = await List.find({ board: boardId, isArchived: false })
-    .sort({ position: 1 });
-
   const cards = await List.aggregate([
     { $match: { board: board._id, isArchived: false } },
     {
@@ -109,8 +122,9 @@ export async function getBoardFull(boardId, userId) {
     },
     { $project: { name: 1, position: 1, cards: 1 } },
   ]);
-
-  return { board, lists: cards };
+  const result = { board, lists: cards };
+  await setCache(key, result, CACHE_TTL.SHORT);
+  return result;
 }
 
 export async function updateBoard(boardId, userId, data) {
@@ -124,6 +138,7 @@ export async function updateBoard(boardId, userId, data) {
 
   Object.assign(board, data);
   await board.save();
+  await invalidateBoardCache(board.workspace, boardId);
   return board;
 }
 
@@ -138,6 +153,7 @@ export async function deleteBoard(boardId, userId) {
 
   await List.deleteMany({ board: boardId });
   await board.deleteOne();
+  await invalidateBoardCache(board.workspace, boardId);
 }
 
 export async function addMember(boardId, userId, memberId) {
@@ -152,6 +168,7 @@ export async function addMember(boardId, userId, memberId) {
   if (!board.members.some(m => m.toString() === memberId)) {
     board.members.push(memberId);
     await board.save();
+    await invalidateBoardCache(board.workspace, boardId);
   }
   return board;
 }
@@ -171,6 +188,7 @@ export async function removeMember(boardId, userId, memberId) {
 
   board.members = board.members.filter(m => m.toString() !== memberId);
   await board.save();
+  await invalidateBoardCache(board.workspace, boardId);
   return board;
 }
 

@@ -13,17 +13,19 @@ A lightweight Notion/Trello/Slack-inspired SaaS built with modern tech stack.
 - RBAC (Owner/Admin/Member)
 
 **Frontend**
-- React 18 + Vite + TypeScript
-- Zustand for state management
-- React Hook Form + Zod
+- React 19 + Vite 8 + TypeScript
+- Redux Toolkit + React-Redux
+- React Hook Form + Zod (zodResolver)
 - dnd-kit for drag & drop
-- Tailwind CSS
+- Tailwind CSS 4 + dark mode (ThemeContext)
 - Socket.io client
+- PWA (vite-plugin-pwa + Workbox) offline queue
 
 **DevOps**
-- Docker + Docker Compose
-- GitHub Actions CI/CD
-- Swagger/OpenAPI docs
+- Docker + Docker Compose (healthchecks, multi-stage)
+- GitHub Actions CI/CD (lint → test → build → compose)
+- Swagger/OpenAPI docs (`/api-docs` + `docs/openapi.yaml`)
+- Winston + Morgan logging, Audit logs
 
 ## Features
 
@@ -52,13 +54,14 @@ cd flow
 # Copy environment files
 cp backend/.env.example backend/.env
 
-# Start all services
-docker-compose up -d
+# Start all services (with healthchecks)
+docker compose up -d --wait
 
 # Access:
-# Frontend: http://localhost:5173
+# Frontend: http://localhost:5173 (PWA offline capable)
 # Backend API: http://localhost:3000
 # API Docs: http://localhost:3000/api-docs
+# Health: http://localhost:3000/health
 ```
 
 ### Local Development
@@ -181,32 +184,39 @@ const socket = io('http://localhost:3000', {
 flow/
 ├── backend/
 │   ├── src/
-│   │   ├── config/          # DB, Redis, Queue config
-│   │   ├── middleware/      # Auth, RBAC, Audit, Error handling
+│   │   ├── config/          # DB, Redis, Queue, Logger, Env
+│   │   ├── middleware/      # Auth, RBAC, Audit, Error, Validate, Upload
 │   │   ├── modules/
-│   │   │   ├── auth/        # Auth module
-│   │   │   ├── users/       # User management
-│   │   │   ├── workspaces/  # Workspace CRUD + members
-│   │   │   ├── boards/      # Board CRUD
-│   │   │   ├── lists/       # List CRUD + reorder
-│   │   │   ├── cards/       # Card CRUD + move + assignees
-│   │   │   └── chat/        # Channels + messages
-│   │   ├── socket/          # Socket.io handlers
-│   │   ├── jobs/            # BullMQ processors
+│   │   │   ├── auth/        # Auth + JWT + Session
+│   │   │   ├── workspaces/  # Workspace CRUD + members (cached)
+│   │   │   ├── boards/      # Board CRUD + aggregations + stats
+│   │   │   ├── lists/       # List CRUD + reorder (transaction)
+│   │   │   ├── cards/       # Card CRUD + move (transaction) + search + assignees
+│   │   │   ├── chat/        # Channels + DM + messages
+│   │   │   ├── notes/       # Notes + text search
+│   │   │   └── audit/       # AuditLog model
+│   │   ├── socket/          # Socket.io handlers (rooms)
+│   │   ├── jobs/            # BullMQ processors (email, notifications)
 │   │   ├── utils/           # JWT, constants, helpers
-│   │   └── app.js           # Express app setup
-│   └── tests/               # API tests
+│   │   └── app.js           # Express app (morgan, helmet, swagger)
+│   └── tests/               # API tests (auth, workspace, board)
 ├── ui/
 │   ├── src/
-│   │   ├── store/           # Zustand stores
-│   │   ├── api/             # Axios + endpoints
-│   │   ├── components/      # Shared UI components
-│   │   ├── features/        # Feature components
-│   │   ├── hooks/           # Custom hooks
-│   │   └── utils/           # Helpers
-│   └── Dockerfile
-├── docker-compose.yml
-└── .github/workflows/ci.yml
+│   │   ├── app/             # Store, ThemeContext, OfflineQueue
+│   │   ├── api/             # Fetch client (offline queue)
+│   │   ├── components/      # Shared UI + ErrorBoundary + OfflineBanner
+│   │   ├── features/        # Auth (RHF+zod), Board (dnd, optimistic), Chat (infinite scroll), etc.
+│   │   ├── layouts/         # AppLayout (dark toggle) + AuthLayout
+│   │   ├── routes/          # AppRoutes + guards
+│   │   └── test/            # Vitest setup + smoke tests
+│   ├── nginx.conf
+│   └── Dockerfile           # Multi-stage nginx
+├── docs/
+│   ├── architecture.md      # Mermaid architecture diagrams
+│   ├── er-diagram.md        # Mermaid ERD + indexes
+│   └── openapi.yaml         # Swagger export (52 endpoints)
+├── docker-compose.yml       # mongo/redis/api/web with healthchecks
+└── .github/workflows/ci.yml # lint → test → build → compose
 ```
 
 ## Development
@@ -240,16 +250,20 @@ cd ui && npm run format
 
 ## Architecture
 
+> See `docs/architecture.md` (Mermaid) and `docs/er-diagram.md` for detailed diagrams.
+> Swagger: `http://localhost:3000/api-docs` or `docs/openapi.yaml` (52 endpoints, 7 tags).
+
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │   Frontend  │────▶│   Backend   │────▶│   MongoDB   │
-│  (React)    │     │  (Express)  │     │             │
+│ React 19+Vite│     │  Express    │     │             │
+│ PWA/Offline  │     │  RBAC/Cache │     │ Aggregations│
 └─────────────┘     └──────┬──────┘     └─────────────┘
                            │
                     ┌──────┴──────┐
                     │    Redis    │
-                    │  (Cache +   │
-                    │   Queue)    │
+                    │  Cache +    │
+                    │  BullMQ     │
                     └──────┬──────┘
                            │
                     ┌──────┴──────┐
@@ -257,6 +271,11 @@ cd ui && npm run format
                     │  (Real-time)│
                     └─────────────┘
 ```
+
+### Key Enhancements (P1/P2/P3)
+- **P1 Backend:** RBAC middleware wired (`authorizeWorkspace`), Redis cache (`boards`, `board:full`, `workspaces` with SCAN invalidation), Transactions (`moveCard`, `reorderLists`), Card `$text` + regex search, Swagger 52 endpoints, Winston + Morgan logging.
+- **P2 Frontend:** RHF+zod on auth forms, Dark Mode (`ThemeContext` + localStorage), Infinite Scroll (`IntersectionObserver`), PWA + Workbox offline queue.
+- **P3 Deliverables:** `docs/architecture.md`, `docs/er-diagram.md`, `docs/openapi.yaml`, `ui/Dockerfile` + `nginx.conf`, `docker-compose` healthchecks, CI green, coverage fix.
 
 ## Commit Convention
 
