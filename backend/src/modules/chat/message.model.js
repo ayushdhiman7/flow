@@ -1,21 +1,6 @@
-import mongoose, { Document } from 'mongoose';
+import mongoose from 'mongoose';
 
-export interface IMessage extends Document {
-  channel: mongoose.Types.ObjectId;
-  user: mongoose.Types.ObjectId;
-  content: string;
-  replyTo?: mongoose.Types.ObjectId;
-  attachments: Array<{
-    name: string;
-    url: string;
-    type: string;
-    size: number;
-  }>;
-  editedAt?: Date;
-  isDeleted: boolean;
-}
-
-const messageSchema = new mongoose.Schema<IMessage>({
+const messageSchema = new mongoose.Schema({
   channel: { type: mongoose.Schema.Types.ObjectId, ref: 'Channel', required: true, index: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   content: { type: String, required: true },
@@ -33,4 +18,4 @@ const messageSchema = new mongoose.Schema<IMessage>({
 messageSchema.index({ channel: 1, createdAt: -1 });
 messageSchema.index({ user: 1 });
 
-export const Message = mongoose.model<IMessage>('Message', messageSchema);
+export const Message = mongoose.model('Message', messageSchema);

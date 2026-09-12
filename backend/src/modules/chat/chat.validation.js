@@ -26,3 +26,15 @@ export const sendMessageSchema = z.object({
 export const channelIdSchema = z.object({
   params: z.object({ id: z.string().regex(/^[0-9a-fA-F]{24}$/) }),
 });
+
+export const createDMSchema = z.object({
+  body: z.object({
+    userId: z.string().regex(/^[0-9a-fA-F]{24}$/),
+  }),
+});
+
+export const createDMByCodeSchema = z.object({
+  body: z.object({
+    chatCode: z.string().min(6).max(12).regex(/^[A-Z0-9]+$/i),
+  }),
+});

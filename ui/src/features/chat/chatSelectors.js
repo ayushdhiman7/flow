@@ -1,0 +1,10 @@
+export const selectChannels = s => s.chat.channels;
+export const selectDMs = s => s.chat.dms;
+export const selectAllChannels = s => [...s.chat.channels, ...s.chat.dms];
+export const selectCurrentChannelId = s => s.chat.currentChannelId;
+export const selectCurrentChannel = s => [...s.chat.channels, ...s.chat.dms].find(c=>c._id===s.chat.currentChannelId) || null;
+export const selectMessagesForChannel = (s, id) => s.chat.messagesByChannel[id] || { items: [], hasMore: false, nextCursor: null, loading: false };
+export const selectChatLoading = s => s.chat.loading;
+export const selectChatSending = s => s.chat.sending;
+export const selectChatError = s => s.chat.error;
+export const selectChatInitialized = s => s.chat.initialized;

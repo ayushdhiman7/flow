@@ -14,7 +14,17 @@ export function initSocket(server) {
   });
 
   io.use(async (socket, next) => {
-    const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
+    let token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
+    // fallback to httpOnly cookie (accessToken) for browser clients using withCredentials
+    if (!token && socket.handshake.headers.cookie) {
+      const cookies = Object.fromEntries(socket.handshake.headers.cookie.split(';').map(c => {
+        const idx = c.indexOf('=');
+        const k = c.slice(0, idx).trim();
+        const v = c.slice(idx+1).trim();
+        try { return [decodeURIComponent(k), decodeURIComponent(v)]; } catch { return [k, v]; }
+      }));
+      token = cookies.accessToken;
+    }
     if (!token) return next(new Error('Authentication required'));
 
     try {

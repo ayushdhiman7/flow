@@ -3,7 +3,8 @@ import { Message } from './message.model.js';
 import { Workspace } from '../workspaces/workspace.model.js';
 import { AppError } from '../../middleware/error.js';
 import { getMemberRole } from '../workspaces/workspace.service.js';
-import { SOCKET_EVENTS, addNotificationJob } from '../../config/queue.js';
+import { SOCKET_EVENTS } from '../../utils/constants.js';
+import { addNotificationJob } from '../../config/queue.js';
 import { emitToChannel } from '../../socket/socket.js';
 
 export async function createChannel(workspaceId, userId, data) {
@@ -73,6 +74,23 @@ export async function createDM(workspaceId, userId, targetUserId) {
   });
 
   return channel;
+}
+
+export async function createDMByCode(workspaceId, userId, chatCode) {
+  const { User } = await import('../auth/user.model.js');
+  const target = await User.findOne({ chatCode: chatCode.toUpperCase().trim() });
+  if (!target) throw new AppError('User not found for this chat code', 404);
+  if (target._id.toString() === userId) throw new AppError('Cannot DM yourself', 400);
+  // auto-add target to workspace if not already a member so DM is visible to both
+  const targetRole = await getMemberRole(workspaceId, target._id.toString());
+  if (!targetRole) {
+    const workspace = await Workspace.findById(workspaceId);
+    if (!workspace) throw new AppError('Workspace not found', 404);
+    workspace.members.push({ user: target._id, role: 'member' });
+    await workspace.save();
+    await User.findByIdAndUpdate(target._id, { $addToSet: { workspaces: workspaceId } });
+  }
+  return createDM(workspaceId, userId, target._id.toString());
 }
 
 export async function getMessages(channelId, userId, cursor, limit) {

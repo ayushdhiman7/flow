@@ -1,4 +1,3 @@
-import { Request, Response, NextFunction } from 'express';
 import * as svc from './chat.service.js';
 
 export async function createChannel(req, res, next) {
@@ -25,6 +24,13 @@ export async function getChannel(req, res, next) {
 export async function createDM(req, res, next) {
   try {
     const channel = await svc.createDM(req.params.workspaceId, req.user.id, req.body.userId);
+    res.json({ channel });
+  } catch (err) { next(err); }
+}
+
+export async function createDMByCode(req, res, next) {
+  try {
+    const channel = await svc.createDMByCode(req.params.workspaceId, req.user.id, req.body.chatCode);
     res.json({ channel });
   } catch (err) { next(err); }
 }
