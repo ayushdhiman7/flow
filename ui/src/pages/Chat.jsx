@@ -47,18 +47,7 @@ export default function ChatPage() {
     if(channelWorkspaceId && currentId) dispatch(fetchMessages({workspaceId: channelWorkspaceId, channelId: currentId}));
   },[dispatch, channelWorkspaceId, currentId]);
 
-  // polling fallback ensures message is received even if socket missed (e.g. receiver not yet joined or different workspace)
-  useEffect(()=>{
-    if(!channelWorkspaceId || !currentId) return;
-    const id = setInterval(()=> dispatch(fetchMessages({workspaceId: channelWorkspaceId, channelId: currentId})), 3000);
-    return ()=> clearInterval(id);
-  },[dispatch, channelWorkspaceId, currentId]);
-  // also poll DMs list so cross-workspace DM appears quickly for receiver
-  useEffect(()=>{
-    if(!workspaces.length) return;
-    const id = setInterval(()=> dispatch(fetchGlobalDMs(workspaces)), 5000);
-    return ()=> clearInterval(id);
-  },[dispatch, workspaces]);
+
 
   const handleSelect = (id) => dispatch(selectChannel(id));
 

@@ -97,21 +97,23 @@ export async function getMessages(channelId, userId, cursor, limit) {
   const channel = await getChannelById(channelId, userId);
 
   const query = { channel: channelId, isDeleted: false };
-  if (cursor) query._id = { $gt: cursor };
+  if (cursor) query._id = { $lt: cursor };
 
   const messages = await Message.find(query)
     .populate('user', 'name email avatar')
     .populate('replyTo', 'content user')
-    .sort({ createdAt: 1 })
+    .sort({ createdAt: -1 })
     .limit(limit + 1);
 
   const hasMore = messages.length > limit;
   if (hasMore) messages.pop();
 
+  // return oldest last for consistent frontend sorting, nextCursor is oldest id for pagination
+  const sorted = messages.slice().reverse();
   return {
-    messages: messages.reverse(),
+    messages: sorted,
     hasMore,
-    nextCursor: messages.length ? messages[0]._id.toString() : null,
+    nextCursor: sorted.length ? sorted[0]._id.toString() : null,
   };
 }
 

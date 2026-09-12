@@ -5,7 +5,7 @@ export const createChannelSchema = z.object({
   body: z.object({
     name: z.string().min(1).max(50).optional(),
     type: z.enum(Object.values(CHANNEL_TYPES)).default(CHANNEL_TYPES.CHANNEL),
-    memberIds: z.array(z.string().regex(/^[0-9a-fA-F]{24}$/)).min(1),
+    memberIds: z.array(z.string().regex(/^[0-9a-fA-F]{24}$/)).optional().default([]),
   }),
 });
 
