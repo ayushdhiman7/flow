@@ -1,5 +1,5 @@
 # =========================
-# Backend - Production Gitignore
+# UI (Vite + React) - Production Gitignore
 # =========================
 
 # Dependencies
@@ -9,16 +9,19 @@ node_modules/
 
 # Build
 dist/
+dist-ssr/
 build/
+out/
 *.tsbuildinfo
 
-# Env & secrets
+# Env & secrets (Vite uses VITE_ prefix)
 .env
 .env.local
 .env.*.local
 .env.development.local
 .env.production.local
 .env.test.local
+*.local
 
 # Logs
 logs/
@@ -26,6 +29,8 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 pids/
 *.pid
 *.seed
@@ -34,27 +39,23 @@ pids/
 # Coverage
 coverage/
 .nyc_output/
-junit.xml
 
-# Uploads (user content, keep dir but ignore files)
-uploads/*
-!uploads/.gitkeep
-
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
+# Editor
+.vscode/*
+!.vscode/extensions.json
 .idea/
-*.swp
-*.swo
-*~
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
 # Cache
 .eslintcache
 .cache/
+.parcel-cache/
 .turbo/
+.vite/
 tmp/
 temp/
-*.tmp

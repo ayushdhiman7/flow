@@ -1,6 +1,7 @@
 import { createWorker } from '../config/queue.js';
+import { isTest } from '../config/env.js';
 
-export const emailWorker = createWorker('email', async (job) => {
+export const emailWorker = isTest ? null : createWorker('email', async (job) => {
   const { name, data } = job;
   console.log(`[Email Job] ${name}:`, data);
 

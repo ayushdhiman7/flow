@@ -1,8 +1,9 @@
 import request from 'supertest';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
-import { app } from '../src/app.js';
+import app from '../src/app.js';
 import { User } from '../src/modules/auth/user.model.js';
+import { Session } from '../src/modules/auth/session.model.js';
 
 let mongoServer;
 let server;
@@ -25,6 +26,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await User.deleteMany({});
+  await Session.deleteMany({});
 });
 
 describe('Auth API', () => {

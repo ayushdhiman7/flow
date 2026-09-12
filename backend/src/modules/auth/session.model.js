@@ -1,15 +1,6 @@
-import mongoose, { Document } from 'mongoose';
+import mongoose from 'mongoose';
 
-export interface ISession extends Document {
-  userId: mongoose.Types.ObjectId;
-  refreshToken: string;
-  userAgent?: string;
-  ip?: string;
-  expiresAt: Date;
-  revoked: boolean;
-}
-
-const sessionSchema = new mongoose.Schema<ISession>({
+const sessionSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   refreshToken: { type: String, required: true, unique: true, index: true },
   userAgent: { type: String },
@@ -20,4 +11,4 @@ const sessionSchema = new mongoose.Schema<ISession>({
 
 sessionSchema.index({ userId: 1, revoked: 1 });
 
-export const Session = mongoose.model<ISession>('Session', sessionSchema);
+export const Session = mongoose.model('Session', sessionSchema);

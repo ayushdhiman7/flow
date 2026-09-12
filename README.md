@@ -71,7 +71,7 @@ npm install
 npm run dev
 
 # Terminal 2 - Frontend
-cd frontend
+cd ui
 npm install
 npm run dev
 
@@ -196,7 +196,7 @@ flow/
 │   │   ├── utils/           # JWT, constants, helpers
 │   │   └── app.js           # Express app setup
 │   └── tests/               # API tests
-├── frontend/
+├── ui/
 │   ├── src/
 │   │   ├── store/           # Zustand stores
 │   │   ├── api/             # Axios + endpoints
@@ -217,7 +217,7 @@ flow/
 cd backend && npm test
 
 # Frontend
-cd frontend && npm test
+cd ui && npm test
 ```
 
 ### Linting
@@ -226,7 +226,7 @@ cd frontend && npm test
 cd backend && npm run lint
 
 # Frontend
-cd frontend && npm run lint
+cd ui && npm run lint
 ```
 
 ### Code Formatting
@@ -235,7 +235,7 @@ cd frontend && npm run lint
 cd backend && npm run format
 
 # Frontend
-cd frontend && npm run format
+cd ui && npm run format
 ```
 
 ## Architecture

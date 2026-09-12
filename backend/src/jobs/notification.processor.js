@@ -1,8 +1,9 @@
 import { createWorker } from '../config/queue.js';
+import { isTest } from '../config/env.js';
 import { emitToUser } from '../socket/socket.js';
 import { SOCKET_EVENTS } from '../utils/constants.js';
 
-export const notificationWorker = createWorker('notifications', async (job) => {
+export const notificationWorker = isTest ? null : createWorker('notifications', async (job) => {
   const { name, data } = job;
   console.log(`[Notification Job] ${name}:`, data);
 

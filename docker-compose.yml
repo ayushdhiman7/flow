@@ -56,7 +56,7 @@ services:
 
   web:
     build:
-      context: ./frontend
+      context: ./ui
       dockerfile: Dockerfile
     container_name: flow-web
     ports:

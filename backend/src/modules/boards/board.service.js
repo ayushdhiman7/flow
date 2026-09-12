@@ -13,23 +13,33 @@ export async function createBoard(workspaceId, userId, data) {
   const role = await getMemberRole(workspaceId, userId);
   if (!role) throw new AppError('Not a member of this workspace', 403);
 
-  const board = await Board.create({
-    ...data,
-    workspace: workspaceId,
-    createdBy: userId,
-    members: [userId],
-  });
+  // Transaction for atomic board + default lists creation
+  const session = await Workspace.db.startSession();
+  session.startTransaction();
+  try {
+    const [board] = await Board.create([{
+      ...data,
+      workspace: workspaceId,
+      createdBy: userId,
+      members: [userId],
+    }], { session });
 
-  const lists = await List.insertMany(DEFAULT_LISTS.map((name, index) => ({
-    board: board._id,
-    name,
-    position: index * 1000,
-  })));
+    const lists = await List.insertMany(DEFAULT_LISTS.map((name, index) => ({
+      board: board._id,
+      name,
+      position: index * 1000,
+    })), { session });
 
-  board.lists = lists.map(l => l._id);
-  await board.save();
-
-  return board;
+    board.lists = lists.map(l => l._id);
+    await board.save({ session });
+    await session.commitTransaction();
+    return board;
+  } catch (e) {
+    await session.abortTransaction();
+    throw e;
+  } finally {
+    session.endSession();
+  }
 }
 
 export async function getBoards(workspaceId, userId) {

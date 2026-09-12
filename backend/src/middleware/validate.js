@@ -3,11 +3,15 @@ import { AppError } from './error.js';
 
 export function validate(schema) {
   return (req, res, next) => {
-    const result = schema.safeParse(req.body);
+    const data = { body: req.body, query: req.query, params: req.params, cookies: req.cookies };
+    const result = schema.safeParse(data);
     if (!result.success) {
-      throw new AppError('Validation failed', 400);
+      const details = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+      throw new AppError(`Validation failed: ${details}`, 400);
     }
-    req.body = result.data;
+    if (result.data.body) req.body = result.data.body;
+    if (result.data.query) req.query = result.data.query;
+    if (result.data.params) req.params = result.data.params;
     next();
   };
 }

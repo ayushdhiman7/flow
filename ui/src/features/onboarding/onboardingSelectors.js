@@ -1,0 +1,9 @@
+export const selectOnboarding = (state) => state.onboarding;
+export const selectCurrentStep = (state) => state.onboarding.currentStep;
+export const selectTotalSteps = (state) => state.onboarding.totalSteps;
+export const selectOnboardingData = (state) => state.onboarding.data;
+export const selectOnboardingLoading = (state) => state.onboarding.loading;
+export const selectOnboardingError = (state) => state.onboarding.error;
+export const selectOnboardingCompleted = (state) => state.onboarding.completed;
+export const selectOnboardingWorkspace = (state) => state.onboarding.workspace;
+export const selectOnboardingWorkspaces = (state) => state.onboarding.workspaces;

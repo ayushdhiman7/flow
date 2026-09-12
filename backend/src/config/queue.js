@@ -1,5 +1,6 @@
 import { Queue, Worker } from 'bullmq';
 import { redis } from './redis.js';
+import { env } from './env.js';
 
 export const emailQueue = new Queue('email', { connection: redis });
 export const notificationQueue = new Queue('notifications', { connection: redis });

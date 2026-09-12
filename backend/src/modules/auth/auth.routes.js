@@ -3,6 +3,7 @@ import * as ctrl from './auth.controller.js';
 import { authenticate } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
 import { registerSchema, loginSchema, updateProfileSchema, changePasswordSchema } from './auth.validation.js';
+import { upload } from '../../middleware/upload.js';
 
 const router = Router();
 
@@ -13,6 +14,7 @@ router.post('/logout', authenticate, ctrl.logout);
 
 router.get('/me', authenticate, ctrl.me);
 router.put('/me', authenticate, validate(updateProfileSchema), ctrl.updateProfile);
+router.post('/me/avatar', authenticate, upload.single('avatar'), ctrl.uploadAvatar);
 router.put('/me/password', authenticate, validate(changePasswordSchema), ctrl.changePassword);
 router.get('/by-code/:code', authenticate, ctrl.getByChatCode);
 

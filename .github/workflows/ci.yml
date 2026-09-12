@@ -25,14 +25,14 @@ jobs:
       - name: Install backend dependencies
         run: cd backend && npm ci
 
-      - name: Install frontend dependencies
-        run: cd frontend && npm ci
+      - name: Install ui dependencies
+        run: cd ui && npm ci
 
       - name: Lint backend
         run: cd backend && npm run lint
 
-      - name: Lint frontend
-        run: cd frontend && npm run lint
+      - name: Lint ui
+        run: cd ui && npm run lint
 
   test:
     name: Test
@@ -68,11 +68,11 @@ jobs:
           JWT_REFRESH_SECRET: test-refresh-secret-key-32-chars-long
           NODE_ENV: test
 
-      - name: Install frontend dependencies
-        run: cd frontend && npm ci
+      - name: Install ui dependencies
+        run: cd ui && npm ci
 
-      - name: Run frontend tests
-        run: cd frontend && npm test
+      - name: Run ui tests
+        run: cd ui && npm test
         env:
           VITE_API_URL: http://localhost:3000
 
@@ -92,14 +92,14 @@ jobs:
       - name: Build backend
         run: cd backend && npm run build 2>/dev/null || true
 
-      - name: Build frontend
-        run: cd frontend && npm run build
+      - name: Build ui
+        run: cd ui && npm run build
 
       - name: Build backend Docker image
         run: docker build -t flow-api:latest ./backend
 
-      - name: Build frontend Docker image
-        run: docker build -t flow-web:latest ./frontend
+      - name: Build ui Docker image
+        run: docker build -t flow-web:latest ./ui
 
   docker-compose:
     name: Docker Compose Test

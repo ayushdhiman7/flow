@@ -60,6 +60,15 @@ export async function updateProfile(req, res, next) {
   } catch (err) { next(err); }
 }
 
+export async function uploadAvatar(req, res, next) {
+  try {
+    if (!req.file) throw new Error('No file uploaded');
+    const avatarUrl = `/uploads/${req.file.filename}`;
+    const user = await authService.updateProfile(req.user.id, { avatar: avatarUrl });
+    res.json({ user, avatar: avatarUrl });
+  } catch (err) { next(err); }
+}
+
 export async function changePassword(req, res, next) {
   try {
     await authService.changePassword(req.user.id, req.body.currentPassword, req.body.newPassword);
