@@ -1,20 +1,8 @@
-import mongoose, { Document } from 'mongoose';
+import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { ROLES } from '../../utils/constants.js';
 
-export interface IUser extends Document {
-  email: string;
-  password: string;
-  name: string;
-  avatar?: string;
-  role: typeof ROLES[keyof typeof ROLES];
-  workspaces: mongoose.Types.ObjectId[];
-  isActive: boolean;
-  lastLoginAt?: Date;
-  comparePassword(candidate: string): Promise<boolean>;
-}
-
-const userSchema = new mongoose.Schema<IUser>({
+const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, index: true },
   password: { type: String, required: true, minlength: 8, select: false },
   name: { type: String, required: true, trim: true },
@@ -23,9 +11,28 @@ const userSchema = new mongoose.Schema<IUser>({
   workspaces: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Workspace' }],
   isActive: { type: Boolean, default: true },
   lastLoginAt: { type: Date },
+  chatCode: { type: String, unique: true, sparse: true, index: true },
 }, { timestamps: true });
 
+function generateChatCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
 userSchema.pre('save', async function (next) {
+  if (!this.chatCode) {
+    let code;
+    let exists = true;
+    let attempts = 0;
+    while (exists && attempts < 10) {
+      code = generateChatCode();
+      exists = await mongoose.models.User.exists({ chatCode: code });
+      attempts++;
+    }
+    this.chatCode = code;
+  }
   if (!this.isModified('password')) return next();
   this.password = await bcrypt.hash(this.password, 12);
   next();
@@ -35,7 +42,6 @@ userSchema.methods.comparePassword = async function (candidate) {
   return bcrypt.compare(candidate, this.password);
 };
 
-userSchema.index({ email: 1 });
 userSchema.index({ name: 'text' });
 
-export const User = mongoose.model<IUser>('User', userSchema);
+export const User = mongoose.model('User', userSchema);
