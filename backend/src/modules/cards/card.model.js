@@ -1,27 +1,6 @@
-import mongoose, { Document } from 'mongoose';
+import mongoose from 'mongoose';
 
-export interface ICard extends Document {
-  list: mongoose.Types.ObjectId;
-  board: mongoose.Types.ObjectId;
-  title: string;
-  description?: string;
-  position: number;
-  assignees: mongoose.Types.ObjectId[];
-  labels: string[];
-  dueDate?: Date;
-  startDate?: Date;
-  isArchived: boolean;
-  completedAt?: Date;
-  createdBy: mongoose.Types.ObjectId;
-  attachments: Array<{
-    name: string;
-    url: string;
-    type: string;
-    size: number;
-  }>;
-}
-
-const cardSchema = new mongoose.Schema<ICard>({
+const cardSchema = new mongoose.Schema({
   list: { type: mongoose.Schema.Types.ObjectId, ref: 'List', required: true, index: true },
   board: { type: mongoose.Schema.Types.ObjectId, ref: 'Board', required: true, index: true },
   title: { type: String, required: true, trim: true },
@@ -48,4 +27,4 @@ cardSchema.index({ assignees: 1 });
 cardSchema.index({ dueDate: 1 });
 cardSchema.index({ title: 'text', description: 'text' });
 
-export const Card = mongoose.model<ICard>('Card', cardSchema);
+export const Card = mongoose.model('Card', cardSchema);

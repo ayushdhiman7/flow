@@ -1,32 +1,13 @@
-import mongoose, { Document } from 'mongoose';
+import mongoose from 'mongoose';
 import { ROLES } from '../../utils/constants.js';
 
-export interface IWorkspaceMember {
-  user: mongoose.Types.ObjectId;
-  role: typeof ROLES[keyof typeof ROLES];
-  joinedAt: Date;
-}
-
-export interface IWorkspace extends Document {
-  name: string;
-  slug: string;
-  owner: mongoose.Types.ObjectId;
-  members: IWorkspaceMember[];
-  settings: {
-    isPublic: boolean;
-    allowMemberInvite: boolean;
-    defaultBoardVisibility: 'private' | 'workspace';
-  };
-  avatar?: string;
-}
-
-const workspaceMemberSchema = new mongoose.Schema<IWorkspaceMember>({
+const workspaceMemberSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   role: { type: String, enum: Object.values(ROLES), default: ROLES.MEMBER },
   joinedAt: { type: Date, default: Date.now },
 });
 
-const workspaceSchema = new mongoose.Schema<IWorkspace>({
+const workspaceSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   slug: { type: String, required: true, unique: true, lowercase: true, index: true },
   owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -42,4 +23,4 @@ const workspaceSchema = new mongoose.Schema<IWorkspace>({
 workspaceSchema.index({ owner: 1 });
 workspaceSchema.index({ 'members.user': 1 });
 
-export const Workspace = mongoose.model<IWorkspace>('Workspace', workspaceSchema);
+export const Workspace = mongoose.model('Workspace', workspaceSchema);

@@ -2,11 +2,11 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 
 export function generateAccessToken(payload) {
-  return jwt.sign(payload, env.JWT_ACCESS_SECRET, { expiresIn: env.JWT_ACCESS_EXPIRY });
+  return jwt.sign({ ...payload, jti: `${Date.now()}-${Math.random()}` }, env.JWT_ACCESS_SECRET, { expiresIn: env.JWT_ACCESS_EXPIRY });
 }
 
 export function generateRefreshToken(payload) {
-  return jwt.sign(payload, env.JWT_REFRESH_SECRET, { expiresIn: env.JWT_REFRESH_EXPIRY });
+  return jwt.sign({ ...payload, jti: `${Date.now()}-${Math.random()}` }, env.JWT_REFRESH_SECRET, { expiresIn: env.JWT_REFRESH_EXPIRY });
 }
 
 export function verifyAccessToken(token) {

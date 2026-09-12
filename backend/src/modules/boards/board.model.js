@@ -1,17 +1,6 @@
-import mongoose, { Document } from 'mongoose';
+import mongoose from 'mongoose';
 
-export interface IBoard extends Document {
-  workspace: mongoose.Types.ObjectId;
-  name: string;
-  description?: string;
-  background?: string;
-  visibility: 'private' | 'workspace';
-  members: mongoose.Types.ObjectId[];
-  lists: mongoose.Types.ObjectId[];
-  createdBy: mongoose.Types.ObjectId;
-}
-
-const boardSchema = new mongoose.Schema<IBoard>({
+const boardSchema = new mongoose.Schema({
   workspace: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true, index: true },
   name: { type: String, required: true, trim: true },
   description: { type: String, trim: true },
@@ -25,4 +14,4 @@ const boardSchema = new mongoose.Schema<IBoard>({
 boardSchema.index({ workspace: 1, createdAt: -1 });
 boardSchema.index({ members: 1 });
 
-export const Board = mongoose.model<IBoard>('Board', boardSchema);
+export const Board = mongoose.model('Board', boardSchema);

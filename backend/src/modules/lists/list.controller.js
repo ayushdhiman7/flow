@@ -1,4 +1,3 @@
-import { Request, Response, NextFunction } from 'express';
 import * as svc from './list.service.js';
 
 export async function createList(req, res, next) {

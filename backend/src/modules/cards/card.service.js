@@ -3,7 +3,8 @@ import { List } from '../lists/list.model.js';
 import { Board } from '../boards/board.model.js';
 import { AppError } from '../../middleware/error.js';
 import { getMemberRole } from '../workspaces/workspace.service.js';
-import { CARD_ACTIONS, addNotificationJob } from '../../config/queue.js';
+import { CARD_ACTIONS } from '../../utils/constants.js';
+import { addNotificationJob } from '../../config/queue.js';
 import { emitToBoard } from '../../socket/socket.js';
 
 export async function createCard(listId, userId, data) {

@@ -1,4 +1,3 @@
-import { Request, Response, NextFunction } from 'express';
 import * as svc from './board.service.js';
 
 export async function createBoard(req, res, next) {

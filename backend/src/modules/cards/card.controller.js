@@ -1,4 +1,3 @@
-import { Request, Response, NextFunction } from 'express';
 import * as svc from './card.service.js';
 import { CARD_ACTIONS } from '../../utils/constants.js';
 
