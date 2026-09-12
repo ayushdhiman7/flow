@@ -14,5 +14,6 @@ router.post('/logout', authenticate, ctrl.logout);
 router.get('/me', authenticate, ctrl.me);
 router.put('/me', authenticate, validate(updateProfileSchema), ctrl.updateProfile);
 router.put('/me/password', authenticate, validate(changePasswordSchema), ctrl.changePassword);
+router.get('/by-code/:code', authenticate, ctrl.getByChatCode);
 
 export default router;

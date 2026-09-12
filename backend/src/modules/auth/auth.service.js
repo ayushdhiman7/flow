@@ -59,7 +59,26 @@ export async function logoutAll(userId) {
 export async function getMe(userId) {
   const user = await User.findById(userId);
   if (!user) throw new AppError('User not found', 404);
+  // auto-generate chatCode for old users without it
+  if (!user.chatCode) {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code;
+    let exists = true;
+    while (exists) {
+      code = Array.from({length:8},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
+      exists = await User.exists({ chatCode: code });
+    }
+    user.chatCode = code;
+    await user.save();
+  }
   return sanitizeUser(user);
+}
+
+export async function findByChatCode(code) {
+  const user = await User.findOne({ chatCode: code.toUpperCase().trim() });
+  if (!user) throw new AppError('User not found for this chat code', 404);
+  const safe = sanitizeUser(user);
+  return { _id: safe._id, name: safe.name, email: safe.email, avatar: safe.avatar, chatCode: safe.chatCode };
 }
 
 export async function updateProfile(userId, data) {

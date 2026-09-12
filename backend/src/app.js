@@ -18,6 +18,7 @@ import boardRoutes from './modules/boards/board.routes.js';
 import listRoutes from './modules/lists/list.routes.js';
 import cardRoutes from './modules/cards/card.routes.js';
 import chatRoutes from './modules/chat/chat.routes.js';
+import noteRoutes from './modules/notes/note.routes.js';
 
 import { initSocket } from './socket/socket.js';
 import './jobs/index.js';
@@ -72,6 +73,7 @@ app.use('/api/workspaces/:workspaceId/boards', auditLog('board:access', 'board')
 app.use('/api/boards/:boardId/lists', auditLog('list:access', 'list'), listRoutes);
 app.use('/api/lists/:listId/cards', auditLog('card:access', 'card'), cardRoutes);
 app.use('/api/workspaces/:workspaceId/channels', auditLog('channel:access', 'channel'), chatRoutes);
+app.use('/api/workspaces/:workspaceId/notes', auditLog('note:access', 'note'), noteRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

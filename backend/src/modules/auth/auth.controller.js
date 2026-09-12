@@ -1,4 +1,3 @@
-import { Request, Response, NextFunction } from 'express';
 import * as authService from './auth.service.js';
 import { setTokenCookies, clearTokenCookies } from '../../utils/jwt.js';
 
@@ -43,6 +42,13 @@ export async function logout(req, res, next) {
 export async function me(req, res, next) {
   try {
     const user = await authService.getMe(req.user.id);
+    res.json({ user });
+  } catch (err) { next(err); }
+}
+
+export async function getByChatCode(req, res, next) {
+  try {
+    const user = await authService.findByChatCode(req.params.code);
     res.json({ user });
   } catch (err) { next(err); }
 }
