@@ -5,7 +5,8 @@ import { AppError } from '../../middleware/error.js';
 import { getMemberRole } from '../workspaces/workspace.service.js';
 import { SOCKET_EVENTS } from '../../utils/constants.js';
 import { addNotificationJob } from '../../config/queue.js';
-import { emitToChannel } from '../../socket/socket.js';
+import { emitToChannel, emitToUser } from '../../socket/socket.js';
+import { cacheKey, delCache } from '../../config/redis.js';
 
 export async function createChannel(workspaceId, userId, data) {
   const workspace = await Workspace.findById(workspaceId);
@@ -21,6 +22,13 @@ export async function createChannel(workspaceId, userId, data) {
     members: memberIds,
     createdBy: userId,
   });
+
+  // notify members via personal room so cross-workspace DMs appear without polling
+  for (const mid of memberIds) {
+    if (mid.toString() !== userId) {
+      await emitToUser(mid.toString(), 'channel:new', { channel });
+    }
+  }
 
   return channel;
 }
@@ -73,6 +81,10 @@ export async function createDM(workspaceId, userId, targetUserId) {
     createdBy: userId,
   });
 
+  // notify target via personal room for cross-workspace discovery
+  await emitToUser(targetUserId, 'channel:new', { channel });
+  await emitToUser(userId, 'channel:new', { channel });
+
   return channel;
 }
 
@@ -89,6 +101,10 @@ export async function createDMByCode(workspaceId, userId, chatCode) {
     workspace.members.push({ user: target._id, role: 'member' });
     await workspace.save();
     await User.findByIdAndUpdate(target._id, { $addToSet: { workspaces: workspaceId } });
+    // invalidate caches for both users so workspace list updates without polling
+    await delCache(cacheKey('workspaces', target._id.toString()));
+    await delCache(cacheKey('workspaces', userId));
+    await delCache(cacheKey('workspace', workspaceId));
   }
   return createDM(workspaceId, userId, target._id.toString());
 }
@@ -117,6 +133,13 @@ export async function getMessages(channelId, userId, cursor, limit) {
   };
 }
 
+function memberIdString(m) {
+  if (!m) return '';
+  if (typeof m === 'string') return m;
+  if (m._id) return m._id.toString();
+  return m.toString();
+}
+
 export async function sendMessage(channelId, userId, data) {
   const channel = await getChannelById(channelId, userId);
 
@@ -133,6 +156,13 @@ export async function sendMessage(channelId, userId, data) {
     .populate('replyTo', 'content user');
 
   await emitToChannel(channelId, SOCKET_EVENTS.MESSAGE_NEW, { message: populated });
+  // also emit directly to each member's personal room for cross-workspace delivery (no channel join required)
+  for (const mid of channel.members) {
+    const midStr = memberIdString(mid);
+    if (midStr && midStr !== userId) {
+      await emitToUser(midStr, SOCKET_EVENTS.MESSAGE_NEW, { message: populated });
+    }
+  }
   await notifyChannelMembers(channel, userId, message);
 
   return populated;
@@ -140,8 +170,8 @@ export async function sendMessage(channelId, userId, data) {
 
 async function notifyChannelMembers(channel, senderId, message) {
   const otherMembers = channel.members
-    .map(m => m.toString())
-    .filter(id => id !== senderId);
+    .map(memberIdString)
+    .filter(id => id && id !== senderId);
 
   for (const memberId of otherMembers) {
     await addNotificationJob('new-message', {

@@ -1,6 +1,6 @@
 import { CheckCircle2, Sparkles, ArrowRight } from "lucide-react";
 
-export default function CompleteStep({ workspace, preferences }) {
+export default function CompleteStep({ workspace, preferences, onNext }) {
   return (
     <div className="space-y-7 text-center">
       <div className="mx-auto h-16 w-16 rounded-2xl bg-emerald-50 border border-emerald-200 grid place-items-center text-emerald-600 shadow-sm">
@@ -23,9 +23,9 @@ export default function CompleteStep({ workspace, preferences }) {
         </div>
       )}
 
-      <div className="rounded-2xl bg-zinc-900 text-white px-4 py-3 flex items-center justify-center gap-2 text-sm font-medium">
+      <button type="button" onClick={onNext} className="w-full rounded-2xl bg-zinc-900 text-white px-4 py-3 flex items-center justify-center gap-2 text-sm font-medium hover:bg-zinc-800 transition-colors cursor-pointer">
         <span>Next: your dashboard awaits</span> <ArrowRight className="h-4 w-4" />
-      </div>
+      </button>
 
       <p className="text-xs text-zinc-500">You can change workspace name and preferences later in Settings.</p>
     </div>

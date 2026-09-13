@@ -13,6 +13,7 @@ import Dashboard from "@/pages/Dashboard";
 import BoardPage from "@/pages/Board";
 import NotesPage from "@/pages/Notes";
 import ChatPage from "@/pages/Chat";
+import Settings from "@/pages/Settings";
 import AppLayout from "@/layouts/AppLayout";
 
 function ProtectedRoute({ children }) {
@@ -51,8 +52,7 @@ export default function AppRoutes() {
         <Route path="/board/:boardId" element={<BoardPage />} />
         <Route path="/notes" element={<NotesPage />} />
         <Route path="/chat" element={<ChatPage />} />
-        <Route path="/calendar" element={<div className="p-8 text-center text-sm text-muted-foreground">Calendar — coming soon</div>} />
-        <Route path="/settings" element={<div className="p-8 text-center text-sm text-muted-foreground">Settings — coming soon</div>} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
 
       <Route path="/" element={<RootRedirect />} />

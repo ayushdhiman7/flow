@@ -7,6 +7,8 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn, clearError } from "@/features/auth/authSlice";
 import { selectAuthLoading, selectAuthError } from "@/features/auth/authSelectors";
+import { isOnboardingCompletedLocal, saveOnboardingLocal } from "@/features/onboarding/onboardingService";
+import { workspaceService } from "@/features/workspace/workspaceService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +36,22 @@ export default function SignInForm() {
     if (serverError) dispatch(clearError());
     const result = await dispatch(signIn({ email: data.email.trim(), password: data.password }));
     if (signIn.fulfilled.match(result)) {
+      const uid = result.payload?.user?._id || result.payload?.user?.id;
+      if (!uid) { navigate("/onboarding", { replace: true }); return; }
+      // 1) localStorage completed
+      if (isOnboardingCompletedLocal(uid)) {
+        navigate("/dashboard", { replace: true });
+        return;
+      }
+      // 2) fallback: if user already has a workspace on server, they are onboarded
+      try {
+        const wss = await workspaceService.getWorkspaces();
+        if (wss && wss.length > 0) {
+          saveOnboardingLocal(uid, { completed: true, completedAt: new Date().toISOString(), data: {} });
+          navigate("/dashboard", { replace: true });
+          return;
+        }
+      } catch {}
       navigate("/onboarding", { replace: true });
     }
   };

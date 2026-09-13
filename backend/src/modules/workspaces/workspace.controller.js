@@ -56,3 +56,29 @@ export async function removeMember(req, res, next) {
     res.json({ workspace });
   } catch (err) { next(err); }
 }
+
+export async function joinByCode(req, res, next) {
+  try {
+    const code = req.body.code || req.body.slug;
+    const result = await svc.joinWorkspaceByCode(req.user.id, code);
+    if (result.status === 'pending') return res.status(202).json({ message: 'Join request sent — awaiting owner approval', workspace: result.workspace });
+    if (result.status === 'already_member') return res.json({ message: 'Already a member', workspace: result.workspace });
+    res.json({ workspace: result.workspace });
+  } catch (err) { next(err); }
+}
+
+export async function getJoinRequests(req, res, next) {
+  try {
+    const requests = await svc.getJoinRequests(req.params.id, req.user.id);
+    res.json({ requests });
+  } catch (err) { next(err); }
+}
+
+export async function handleJoinRequest(req, res, next) {
+  try {
+    const { id, requestId } = req.params;
+    const { action } = req.body; // approve | reject
+    const workspace = await svc.handleJoinRequest(id, requestId, req.user.id, action);
+    res.json({ workspace });
+  } catch (err) { next(err); }
+}

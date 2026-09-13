@@ -19,4 +19,16 @@ export const workspaceService = {
     const data = await api.put(`/workspaces/${id}`, payload);
     return data.workspace || data;
   },
+  async joinByCode(code) {
+    const data = await api.post("/workspaces/join-by-code", { code: code.trim().toLowerCase() });
+    return data; // { message, workspace, status pending }
+  },
+  async getJoinRequests(workspaceId) {
+    const data = await api.get(`/workspaces/${workspaceId}/requests`);
+    return data.requests || data || [];
+  },
+  async handleJoinRequest(workspaceId, requestId, action) {
+    const data = await api.post(`/workspaces/${workspaceId}/requests/${requestId}/handle`, { action });
+    return data.workspace || data;
+  },
 };

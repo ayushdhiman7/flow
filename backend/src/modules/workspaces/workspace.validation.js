@@ -42,3 +42,24 @@ export const memberIdSchema = z.object({
     userId: z.string().regex(/^[0-9a-fA-F]{24}$/),
   }),
 });
+
+export const joinByCodeSchema = z.object({
+  body: z.object({
+    code: z.string().min(3).max(30).trim().regex(/^[a-z0-9-]+$/i, "Code must be slug-like"),
+    slug: z.string().min(3).max(30).trim().regex(/^[a-z0-9-]+$/i).optional(),
+  }).refine(d => d.code || d.slug, { message: "code is required" }),
+});
+
+export const handleRequestSchema = z.object({
+  params: z.object({
+    id: z.string().regex(/^[0-9a-fA-F]{24}$/),
+    requestId: z.string().regex(/^[0-9a-fA-F]{24}$/),
+  }),
+  body: z.object({
+    action: z.enum(['approve', 'reject']),
+  }),
+});
+
+export const workspaceRequestListSchema = z.object({
+  params: z.object({ id: z.string().regex(/^[0-9a-fA-F]{24}$/) }),
+});

@@ -4,3 +4,5 @@ export const selectSelectedWorkspace = (s) => s.workspace.workspaces.find(w => w
 export const selectWorkspaceLoading = (s) => s.workspace.loading;
 export const selectWorkspaceError = (s) => s.workspace.error;
 export const selectWorkspaceInitialized = (s) => s.workspace.initialized;
+export const selectJoinRequests = (s) => s.workspace.joinRequests;
+export const selectJoinMessage = (s) => s.workspace.joinMessage;

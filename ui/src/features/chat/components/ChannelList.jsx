@@ -1,6 +1,7 @@
 import { Hash, MessageCircle, Plus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getAvatarUrl } from "@/lib/avatar";
 
 export default function ChannelList({ channels, currentId, onSelect, onCreateChannel, onCreateDM }) {
   const channelItems = channels.filter(c => c.type !== "dm");
@@ -52,7 +53,7 @@ export default function ChannelList({ channels, currentId, onSelect, onCreateCha
                     currentId===ch._id ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900")}
                 >
                   <div className="h-7 w-7 rounded-full bg-zinc-100 border border-zinc-200 grid place-items-center text-xs font-medium shrink-0 overflow-hidden">
-                    {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : (name?.[0]?.toUpperCase() || "•")}
+                    {getAvatarUrl(avatar) ? <img src={getAvatarUrl(avatar)} alt="" className="h-full w-full object-cover" /> : (name?.[0]?.toUpperCase() || "•")}
                   </div>
                   <span className="truncate flex-1">{name || "Direct message"}</span>
                 </button>

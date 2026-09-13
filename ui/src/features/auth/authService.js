@@ -1,4 +1,4 @@
-import { api } from "@/api/client";
+import { api, apiFetch } from "@/api/client";
 
 export const authService = {
   async signUp({ name, email, password }) {
@@ -40,6 +40,13 @@ export const authService = {
 
   async updateProfile(payload) {
     const data = await api.put("/auth/me", payload);
+    return data.user || data;
+  },
+
+  async uploadAvatar(file) {
+    const form = new FormData();
+    form.append("avatar", file);
+    const data = await apiFetch("/auth/me/avatar", { method: "POST", body: form });
     return data.user || data;
   },
 };

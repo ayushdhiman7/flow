@@ -55,7 +55,7 @@ export default function MessageList({ messages, loading, hasMore, onLoadMore, on
   const normalizedCurrent = currentUserId ? String(currentUserId) : null;
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-auto py-3 space-y-0.5 bg-[#f8f9fb] dark:bg-zinc-900 custom-scrollbar">
+    <div ref={containerRef} className="flex-1 overflow-auto py-3 space-y-0.5 bg-[#f8f9fb] custom-scrollbar">
       <div ref={topSentinelRef} className="h-1" aria-hidden />
       {hasMore && (
         <div className="flex justify-center py-2">

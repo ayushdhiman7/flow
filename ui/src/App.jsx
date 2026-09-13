@@ -6,9 +6,6 @@ import { hydrateForUser } from "@/features/onboarding/onboardingSlice";
 import AppRoutes from "@/routes/AppRoutes";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Loader2 } from "lucide-react";
-import OfflineBanner from "@/components/OfflineBanner";
-import { setupOfflineSync } from "@/app/offlineQueue";
-import { apiFetch } from "@/api/client";
 
 export default function App() {
   const dispatch = useDispatch();
@@ -17,11 +14,16 @@ export default function App() {
 
   useEffect(() => {
     dispatch(initializeAuth());
+    // cleanup legacy offline queue and PWA service worker (offline support removed)
+    try { localStorage.removeItem("flow_offline_queue"); } catch {}
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations?.().then(regs => regs.forEach(r => r.unregister()));
+    }
+    // clear any cached workbox storage
+    if (typeof caches !== "undefined") {
+      caches.keys().then(keys => keys.forEach(k => { if (k.includes("workbox") || k.includes("flow-api")) caches.delete(k); }));
+    }
   }, [dispatch]);
-
-  useEffect(() => {
-    setupOfflineSync(apiFetch);
-  }, []);
 
   useEffect(() => {
     const uid = user?._id || user?.id;
@@ -41,7 +43,6 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <OfflineBanner />
       <AppRoutes />
     </ErrorBoundary>
   );

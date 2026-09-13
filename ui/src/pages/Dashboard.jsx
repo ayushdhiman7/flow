@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, ClipboardList, Clock3, ListTodo, Plus, ArrowUpRight, Layers, TrendingUp, StickyNote, MessageSquare, Hash, Pin } from "lucide-react";
+import { CheckCircle2, ClipboardList, Clock3, ListTodo, Plus, ArrowUpRight, Layers, TrendingUp, StickyNote, MessageSquare, Hash, Pin, Loader2 } from "lucide-react";
 import { selectSelectedWorkspace, selectSelectedWorkspaceId } from "@/features/workspace/workspaceSelectors";
 import { fetchWorkspaces } from "@/features/workspace/workspaceSlice";
 import { fetchBoards, fetchBoardFull, createBoard } from "@/features/board/boardSlice";
@@ -50,7 +50,7 @@ export default function Dashboard() {
 
   const handleCreateBoard = async (e) => {
     e.preventDefault();
-    if (!boardName.trim() || !workspaceId) return;
+    if (!boardName.trim() || !workspaceId || loading) return;
     const res = await dispatch(createBoard({ workspaceId, name: boardName.trim() }));
     if (createBoard.fulfilled.match(res)) {
       setBoardName(""); setCreateOpen(false);
@@ -223,12 +223,12 @@ export default function Dashboard() {
           <form onSubmit={handleCreateBoard} className="space-y-5">
             <div className="space-y-2">
               <Label className="text-[13px]">Board name</Label>
-              <Input value={boardName} onChange={e=>setBoardName(e.target.value)} placeholder="Product roadmap" maxLength={50} className="h-11 rounded-xl" />
+              <Input value={boardName} onChange={e=>setBoardName(e.target.value)} placeholder="Product roadmap" maxLength={50} className="h-11 rounded-xl" disabled={loading} />
               <p className="text-xs text-zinc-500">Boards start with To Do, In Progress and Done columns.</p>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={()=>setCreateOpen(false)} className="rounded-xl">Cancel</Button>
-              <Button type="submit" className="rounded-xl bg-zinc-900 hover:bg-zinc-800">Create board</Button>
+              <Button type="button" variant="outline" onClick={()=>setCreateOpen(false)} className="rounded-xl" disabled={loading}>Cancel</Button>
+              <Button type="submit" className="rounded-xl bg-zinc-900 hover:bg-zinc-800" disabled={loading || !boardName.trim()}>{loading && <Loader2 className="h-4 w-4 animate-spin"/>} Create board</Button>
             </DialogFooter>
           </form>
         </DialogContent>

@@ -3,7 +3,7 @@ import * as ctrl from './workspace.controller.js';
 import { authenticate } from '../../middleware/auth.js';
 import { authorizeWorkspace, attachWorkspaceRole } from '../../middleware/rbac.js';
 import { validate } from '../../middleware/validate.js';
-import { createWorkspaceSchema, updateWorkspaceSchema, inviteMemberSchema, updateMemberSchema, workspaceIdSchema, memberIdSchema } from './workspace.validation.js';
+import { createWorkspaceSchema, updateWorkspaceSchema, inviteMemberSchema, updateMemberSchema, workspaceIdSchema, memberIdSchema, joinByCodeSchema, handleRequestSchema, workspaceRequestListSchema } from './workspace.validation.js';
 
 const router = Router();
 
@@ -44,6 +44,7 @@ router.use(authenticate);
  */
 router.post('/', validate(createWorkspaceSchema), ctrl.createWorkspace);
 router.get('/', ctrl.getWorkspaces);
+router.post('/join-by-code', validate(joinByCodeSchema), ctrl.joinByCode);
 
 /**
  * @swagger
@@ -125,5 +126,9 @@ router.post('/:id/members', validate(workspaceIdSchema), validate(inviteMemberSc
  */
 router.put('/:id/members/:userId', validate(memberIdSchema), validate(updateMemberSchema), authorizeWorkspace('owner'), ctrl.updateMember);
 router.delete('/:id/members/:userId', validate(memberIdSchema), attachWorkspaceRole, ctrl.removeMember);
+
+// Join requests — owner approval flow
+router.get('/:id/requests', validate(workspaceRequestListSchema), authorizeWorkspace('owner', 'admin'), ctrl.getJoinRequests);
+router.post('/:id/requests/:requestId/handle', validate(handleRequestSchema), authorizeWorkspace('owner', 'admin'), ctrl.handleJoinRequest);
 
 export default router;

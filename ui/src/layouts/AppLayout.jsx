@@ -1,25 +1,24 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { LayoutDashboard, Kanban, StickyNote, Settings, Calendar, Menu, X, LogOut, Plus, ChevronsUpDown, Building2, Search, Bell, MessageSquare, Moon, Sun } from "lucide-react";
-import { useTheme } from "@/app/ThemeContext.jsx";
+import { LayoutDashboard, Kanban, StickyNote, Settings, Menu, X, LogOut, Plus, ChevronsUpDown, Building2, Search, Bell, MessageSquare } from "lucide-react";
 import { selectUser } from "@/features/auth/authSelectors";
 import { logout } from "@/features/auth/authSlice";
-import { selectWorkspaces, selectSelectedWorkspace, selectSelectedWorkspaceId } from "@/features/workspace/workspaceSelectors";
-import { fetchWorkspaces, selectWorkspace, createWorkspace } from "@/features/workspace/workspaceSlice";
+import { selectWorkspaces, selectSelectedWorkspace, selectSelectedWorkspaceId, selectJoinRequests } from "@/features/workspace/workspaceSelectors";
+import { fetchWorkspaces, selectWorkspace, createWorkspace, joinWorkspace, fetchJoinRequests, handleJoinRequest } from "@/features/workspace/workspaceSlice";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getAvatarUrl } from "@/lib/avatar";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", enabled: true },
   { to: "/board", icon: Kanban, label: "Board", enabled: true },
   { to: "/notes", icon: StickyNote, label: "Notes", enabled: true },
   { to: "/chat", icon: MessageSquare, label: "Chat", enabled: true },
-  { to: "/calendar", icon: Calendar, label: "Calendar", enabled: false },
-  { to: "/settings", icon: Settings, label: "Settings", enabled: false },
+  { to: "/settings", icon: Settings, label: "Settings", enabled: true },
 ];
 
 export default function AppLayout() {
@@ -29,13 +28,22 @@ export default function AppLayout() {
   const selectedId = useSelector(selectSelectedWorkspaceId);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { isDark, toggle } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [wsOpen, setWsOpen] = useState(false);
   const [newWsName, setNewWsName] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [joinError, setJoinError] = useState("");
+  const [joinSuccess, setJoinSuccess] = useState("");
+  const [notifOpen, setNotifOpen] = useState(false);
+  const joinRequests = useSelector(selectJoinRequests);
+  const isOwner = selected?.owner?._id === user?._id || selected?.owner === user?._id || selected?.owner?.toString?.() === (user?._id || user?.id);
 
   useEffect(() => { dispatch(fetchWorkspaces()); }, [dispatch]);
+  useEffect(() => {
+    if (selected?._id && isOwner) dispatch(fetchJoinRequests(selected._id));
+  }, [dispatch, selected?._id, isOwner]);
   const handleLogout = async () => { await dispatch(logout()); navigate("/signin", { replace: true }); };
   const switchWs = (id) => { dispatch(selectWorkspace(id)); setWsOpen(false); setMobileOpen(false); };
   const handleCreateWs = async (e) => {
@@ -44,9 +52,29 @@ export default function AppLayout() {
     const res = await dispatch(createWorkspace({ name: newWsName.trim() }));
     if (createWorkspace.fulfilled.match(res)) { setNewWsName(""); setCreateOpen(false); }
   };
+  const handleJoinWs = async (e) => {
+    e.preventDefault();
+    setJoinError(""); setJoinSuccess("");
+    if (!joinCode.trim()) { setJoinError("Enter workspace code"); return; }
+    const res = await dispatch(joinWorkspace({ code: joinCode.trim() }));
+    if (joinWorkspace.fulfilled.match(res)) {
+      const msg = res.payload?.data?.message || "";
+      if (msg.toLowerCase().includes("awaiting")) {
+        setJoinSuccess(msg);
+        setTimeout(()=>{ setJoinCode(""); setJoinSuccess(""); setJoinOpen(false); }, 1800);
+      } else {
+        setJoinCode(""); setJoinOpen(false); setWsOpen(false);
+      }
+    } else setJoinError(res.payload?.message || "Failed to join");
+  };
+  const handleApprove = async (requestId, action) => {
+    if (!selected?._id) return;
+    const res = await dispatch(handleJoinRequest({ workspaceId: selected._id, requestId, action }));
+    if (handleJoinRequest.fulfilled.match(res)) dispatch(fetchJoinRequests(selected._id));
+  };
 
   return (
-    <div className="min-h-screen bg-[#fbfcfe] dark:bg-zinc-950 flex">
+    <div className="min-h-screen bg-[#fbfcfe] flex">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-[280px] border-r border-zinc-200/70 bg-white flex-col shrink-0">
         <div className="h-[64px] px-5 flex items-center gap-3 border-b border-zinc-100">
@@ -70,7 +98,7 @@ export default function AppLayout() {
                 <ChevronsUpDown className="h-4 w-4 text-zinc-400" />
               </button>
               {wsOpen && (
-                <div className="absolute z-20 mt-2 w-full rounded-xl border border-zinc-200 bg-white shadow-xl p-1.5 max-h-64 overflow-auto">
+                <div className="absolute z-20 mt-2 w-full rounded-xl border border-zinc-200 bg-white shadow-xl p-1.5 max-h-[min(50vh,320px)] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none]">
                   {workspaces.map(ws => (
                     <button key={ws._id} onClick={()=>switchWs(ws._id)} className={cn("w-full text-left px-3 py-2.5 text-sm rounded-lg flex items-center gap-3 hover:bg-zinc-50 transition-colors", selectedId===ws._id && "bg-zinc-900 text-white hover:bg-zinc-900")}>
                       <span className={cn("h-7 w-7 rounded-md grid place-items-center text-xs font-medium shrink-0", selectedId===ws._id ? "bg-white text-zinc-900" : "bg-zinc-100 text-zinc-700")}>{ws.name[0]?.toUpperCase()}</span>
@@ -80,6 +108,29 @@ export default function AppLayout() {
                   ))}
                   <div className="h-px bg-zinc-100 my-1.5" />
                   <button onClick={()=>{setWsOpen(false); setCreateOpen(true);}} className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-zinc-50 text-zinc-600"><Plus className="h-4 w-4"/> New workspace</button>
+                  <button onClick={()=>{setWsOpen(false); setJoinOpen(true);}} className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-zinc-50 text-zinc-600"><Building2 className="h-4 w-4"/> Join by code</button>
+                  {selected?.slug && (
+                    <div className="mt-1.5 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200">
+                      <div className="text-[11px] font-semibold tracking-widest text-zinc-400">INVITE CODE</div>
+                      <div className="font-mono text-sm font-bold tracking-widest truncate">{selected.slug}</div>
+                      <div className="text-[11px] text-zinc-500">Share this code — owner must approve requests</div>
+                    </div>
+                  )}
+                  {isOwner && joinRequests.length > 0 && (
+                    <div className="mt-2 p-2 rounded-xl border border-amber-200 bg-amber-50 space-y-2">
+                      <div className="text-[11px] font-semibold tracking-widest text-amber-700">PENDING REQUESTS ({joinRequests.length})</div>
+                      {joinRequests.map(r => (
+                        <div key={r._id} className="flex items-center gap-2 bg-white rounded-lg border border-amber-200 px-2 py-1.5">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13px] font-medium truncate">{r.user?.name || r.user?.email || "User"}</div>
+                            <div className="text-[11px] text-zinc-500 truncate">{r.user?.email}</div>
+                          </div>
+                          <button onClick={()=>handleApprove(r._id, 'approve')} className="h-7 px-2.5 rounded-lg bg-zinc-900 text-white text-xs font-medium hover:bg-zinc-800">Approve</button>
+                          <button onClick={()=>handleApprove(r._id, 'reject')} className="h-7 px-2.5 rounded-lg border border-zinc-200 bg-white text-xs hover:bg-zinc-50">Reject</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -105,7 +156,9 @@ export default function AppLayout() {
 
         <div className="mt-auto p-4 border-t border-zinc-100 bg-zinc-50/50">
           <div className="flex items-center gap-3 rounded-xl bg-white border border-zinc-200 px-3 py-3 shadow-sm">
-            <div className="h-9 w-9 rounded-full bg-zinc-900 text-white grid place-items-center text-sm font-medium shrink-0">{user?.name?.[0]?.toUpperCase() || "U"}</div>
+            <div className="h-9 w-9 rounded-full bg-zinc-900 text-white grid place-items-center text-sm font-medium shrink-0 overflow-hidden">
+              {getAvatarUrl(user?.avatar) ? <img src={getAvatarUrl(user.avatar)} alt="" className="h-full w-full object-cover" /> : (user?.name?.[0]?.toUpperCase() || "U")}
+            </div>
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-semibold leading-none truncate">{user?.name}</div>
               <div className="text-[11px] text-zinc-500 truncate">{user?.email}</div>
@@ -132,7 +185,8 @@ export default function AppLayout() {
                 </button>
               ))}
               <Button variant="outline" size="sm" className="w-full rounded-xl" onClick={()=>setCreateOpen(true)}><Plus className="h-4 w-4"/> New workspace</Button>
-            </div>
+              <Button variant="outline" size="sm" className="w-full rounded-xl mt-2" onClick={()=>setJoinOpen(true)}><Building2 className="h-4 w-4"/> Join by code</Button>
+              </div>
           </div>
           <nav className="space-y-1">
             {navItems.map(item=> item.enabled ? (
@@ -153,7 +207,7 @@ export default function AppLayout() {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-[64px] border-b border-zinc-200/60 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-zinc-900/60 flex items-center gap-4 px-4 lg:px-8 shrink-0 sticky top-0 z-20">
+        <header className="h-[64px] border-b border-zinc-200/60 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 flex items-center gap-4 px-4 lg:px-8 shrink-0 sticky top-0 z-20">
           <button className="lg:hidden h-9 w-9 rounded-xl border border-zinc-200 grid place-items-center" onClick={()=>setMobileOpen(true)}><Menu className="h-5 w-5"/></button>
           <div className="flex items-center gap-2 text-sm">
             <span className="hidden sm:inline-flex items-center gap-2 text-zinc-500"><Building2 className="h-4 w-4"/> Workspace</span>
@@ -170,16 +224,53 @@ export default function AppLayout() {
             </div>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={toggle} aria-label="Toggle theme" className="h-9 w-9 rounded-xl border border-zinc-200 bg-white dark:bg-zinc-900 dark:border-zinc-700 grid place-items-center text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
-              {isDark ? <Sun className="h-4 w-4"/> : <Moon className="h-4 w-4"/>}
-            </button>
-            <button className="h-9 w-9 rounded-xl border border-zinc-200 bg-white dark:bg-zinc-900 dark:border-zinc-700 grid place-items-center text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50"><Bell className="h-4 w-4"/></button>
+            <div className="relative">
+              <button onClick={()=>setNotifOpen(v=>!v)} className="h-9 w-9 rounded-xl border border-zinc-200 bg-white grid place-items-center text-zinc-600 hover:bg-zinc-50 relative">
+                <Bell className="h-4 w-4"/>
+                {isOwner && joinRequests.length > 0 && <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold grid place-items-center">{joinRequests.length}</span>}
+              </button>
+              {notifOpen && (
+                <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-zinc-200 bg-white shadow-xl p-3 z-30">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-semibold">Notifications</h4>
+                    <button onClick={()=>setNotifOpen(false)} className="h-6 w-6 rounded-lg hover:bg-zinc-100 grid place-items-center"><X className="h-4 w-4"/></button>
+                  </div>
+                  {isOwner && joinRequests.length > 0 ? (
+                    <div className="space-y-2 max-h-64 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      <p className="text-xs text-amber-600 font-medium">{joinRequests.length} pending workspace request{joinRequests.length>1&&"s"}</p>
+                      {joinRequests.map(r=>(
+                        <div key={r._id} className="flex items-center gap-2 rounded-xl border border-zinc-200 p-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{r.user?.name}</div>
+                            <div className="text-xs text-zinc-500 truncate">{r.user?.email} → {selected?.name}</div>
+                          </div>
+                          <button onClick={()=>handleApprove(r._id,'approve')} className="h-7 px-2 rounded-lg bg-zinc-900 text-white text-xs">Approve</button>
+                          <button onClick={()=>handleApprove(r._id,'reject')} className="h-7 px-2 rounded-lg border text-xs">Reject</button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-6 text-center">
+                      <p className="text-sm text-zinc-500">No new notifications</p>
+                      <p className="text-xs text-zinc-400 mt-1">Workspace join requests will appear here for owners.</p>
+                      {joinSuccess && <p className="text-xs text-emerald-600 mt-2">{joinSuccess}</p>}
+                    </div>
+                  )}
+                  <div className="mt-3 pt-2 border-t border-zinc-100 flex gap-2">
+                    <Button variant="outline" size="sm" className="flex-1 rounded-xl" onClick={()=>{setNotifOpen(false); setJoinOpen(true);}}>Join by code</Button>
+                    <Button variant="ghost" size="sm" className="flex-1 rounded-xl" onClick={()=>setNotifOpen(false)}>Close</Button>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="hidden sm:flex items-center gap-3 pl-3 border-l border-zinc-200">
               <div className="text-right hidden lg:block">
                 <div className="text-sm font-medium leading-none">{user?.name}</div>
                 <div className="text-xs text-zinc-500">{user?.email}</div>
               </div>
-              <div className="h-9 w-9 rounded-full bg-zinc-900 text-white grid place-items-center text-sm font-medium">{user?.name?.[0]?.toUpperCase()}</div>
+              <div className="h-9 w-9 rounded-full bg-zinc-900 text-white grid place-items-center text-sm font-medium overflow-hidden">
+                {getAvatarUrl(user?.avatar) ? <img src={getAvatarUrl(user.avatar)} alt="" className="h-full w-full object-cover" /> : (user?.name?.[0]?.toUpperCase() || "U")}
+              </div>
             </div>
           </div>
         </header>
@@ -200,6 +291,25 @@ export default function AppLayout() {
             <DialogFooter>
               <Button type="button" variant="outline" onClick={()=>setCreateOpen(false)} className="rounded-xl">Cancel</Button>
               <Button type="submit" className="rounded-xl bg-zinc-900 hover:bg-zinc-800">Create workspace</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={joinOpen} onOpenChange={setJoinOpen}>
+        <DialogContent onClose={()=>setJoinOpen(false)} className="rounded-2xl">
+          <DialogHeader><DialogTitle className="text-[16px]">Join workspace by code</DialogTitle></DialogHeader>
+          <form onSubmit={handleJoinWs} className="space-y-5">
+            <div className="space-y-2">
+              <Label className="text-[13px]">Invite code (slug)</Label>
+              <Input value={joinCode} onChange={e=>{setJoinCode(e.target.value); setJoinError(""); setJoinSuccess("");}} placeholder="e.g. acme-inc" maxLength={30} autoFocus className="h-11 rounded-xl font-mono" />
+              <p className="text-xs text-zinc-500">Ask workspace owner for the slug — request will pend until owner approves.</p>
+              {joinError && <p className="text-xs text-red-600">{joinError}</p>}
+              {joinSuccess && <p className="text-xs text-emerald-600 font-medium">{joinSuccess}</p>}
+              {selected?.slug && <p className="text-xs text-zinc-500">Your current workspace code: <span className="font-mono font-bold">{selected.slug}</span></p>}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={()=>setJoinOpen(false)} className="rounded-xl">Cancel</Button>
+              <Button type="submit" className="rounded-xl bg-zinc-900 hover:bg-zinc-800">Join workspace</Button>
             </DialogFooter>
           </form>
         </DialogContent>

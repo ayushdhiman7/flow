@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash2, Pin } from "lucide-react";
+import { getAvatarUrl } from "@/lib/avatar";
 
 export default function NoteCard({ note, onEdit, onDelete, onTogglePin }) {
   return (
@@ -12,7 +13,10 @@ export default function NoteCard({ note, onEdit, onDelete, onTogglePin }) {
         </div>
         {note.content && <p className="text-[13px] leading-relaxed text-zinc-600 line-clamp-3 whitespace-pre-wrap">{note.content}</p>}
         <div className="mt-auto flex items-center justify-between pt-2 border-t border-zinc-100">
-          <span className="text-[11px] text-zinc-500">{new Date(note.updatedAt).toLocaleDateString(undefined,{month:"short",day:"numeric"})} • {note.author?.name || "You"}</span>
+          <span className="text-[11px] text-zinc-500 flex items-center gap-1.5">
+            {getAvatarUrl(note.author?.avatar) ? <img src={getAvatarUrl(note.author.avatar)} alt="" className="h-4 w-4 rounded-full object-cover" /> : null}
+            {new Date(note.updatedAt).toLocaleDateString(undefined,{month:"short",day:"numeric"})} • {note.author?.name || "You"}
+          </span>
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-zinc-100 cursor-pointer" onClick={()=>onTogglePin(note)} title="Pin"><Pin className={`h-3.5 w-3.5 ${note.isPinned?"fill-zinc-900 text-zinc-900":""}`}/></Button>
             <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-zinc-100 cursor-pointer" onClick={()=>onEdit(note)}><Pencil className="h-3.5 w-3.5"/></Button>

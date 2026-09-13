@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { Reply, CheckCheck } from "lucide-react";
+import { getAvatarUrl } from "@/lib/avatar";
 
 function getUserId(u) {
   if (!u) return null;
@@ -50,8 +51,8 @@ export default function MessageItem({ message, isOwn, onReply }) {
   return (
     <div className="group flex gap-2.5 px-4 py-1">
       <div className="h-8 w-8 rounded-full bg-zinc-900 text-white grid place-items-center text-xs font-medium shrink-0 overflow-hidden mt-0.5">
-        {user.avatar ? (
-          <img src={user.avatar} alt="" className="h-full w-full object-cover" />
+        {getAvatarUrl(user.avatar) ? (
+          <img src={getAvatarUrl(user.avatar)} alt="" className="h-full w-full object-cover" />
         ) : (
           user.name?.[0]?.toUpperCase() || "•"
         )}

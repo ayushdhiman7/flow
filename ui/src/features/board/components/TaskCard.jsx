@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { getAvatarUrl } from "@/lib/avatar";
 
 export default function TaskCard({ card, onEdit, onDelete, isOverlay = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({ id: card._id, data: { card } });
@@ -72,9 +73,14 @@ export default function TaskCard({ card, onEdit, onDelete, isOverlay = false }) 
             <div className="flex items-center gap-1">
               {card.assignees?.length>0 && (
                 <div className="flex -space-x-1.5">
-                  {card.assignees.slice(0,3).map((a,idx)=>(
-                    <span key={idx} className="h-6 w-6 rounded-full bg-zinc-900 text-white grid place-items-center text-[10px] font-medium border-2 border-white shadow-sm">{initials(a.name || a.email || a)}</span>
-                  ))}
+                  {card.assignees.slice(0,3).map((a,idx)=>{
+                    const av = getAvatarUrl(a.avatar);
+                    return av ? (
+                      <img key={idx} src={av} alt="" className="h-6 w-6 rounded-full border-2 border-white shadow-sm object-cover" />
+                    ) : (
+                      <span key={idx} className="h-6 w-6 rounded-full bg-zinc-900 text-white grid place-items-center text-[10px] font-medium border-2 border-white shadow-sm">{initials(a.name || a.email || a)}</span>
+                    );
+                  })}
                 </div>
               )}
               <div className={`flex gap-0.5 transition-all duration-200 ml-1 ${isOverlay ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>

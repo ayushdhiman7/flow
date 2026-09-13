@@ -1,10 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import { ThemeProvider } from "@/app/ThemeContext";
 
 describe("smoke", () => {
-  it("renders ThemeProvider", () => {
-    const { container } = render(<ThemeProvider><div>hello</div></ThemeProvider>);
+  it("renders div", () => {
+    const { container } = render(<div>hello</div>);
     expect(container.textContent).toContain("hello");
   });
   it("api client base", async () => {

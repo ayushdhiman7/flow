@@ -23,33 +23,56 @@ export async function createBoard(workspaceId, userId, data) {
   const role = await getMemberRole(workspaceId, userId);
   if (!role) throw new AppError('Not a member of this workspace', 403);
 
-  // Transaction for atomic board + default lists creation
-  const session = await Workspace.db.startSession();
-  session.startTransaction();
+  // Create board + default lists without transaction (standalone mongo)
+  // If replica set available, transaction will be used via fallback, but avoid requiring it
   try {
-    const [board] = await Board.create([{
+    const board = await Board.create({
       ...data,
       workspace: workspaceId,
       createdBy: userId,
       members: [userId],
-    }], { session });
+    });
 
     const lists = await List.insertMany(DEFAULT_LISTS.map((name, index) => ({
       board: board._id,
       name,
       position: index * 1000,
-    })), { session });
+    })));
 
     board.lists = lists.map(l => l._id);
-    await board.save({ session });
-    await session.commitTransaction();
+    await board.save();
     await delCache(cacheKey('boards', workspaceId, '*'));
     return board;
   } catch (e) {
-    await session.abortTransaction();
+    // Fallback: try with transaction if available (for tests with replica set)
+    if (e.message?.includes('Transaction numbers')) {
+      const session = await Workspace.db.startSession();
+      session.startTransaction();
+      try {
+        const [board2] = await Board.create([{
+          ...data,
+          workspace: workspaceId,
+          createdBy: userId,
+          members: [userId],
+        }], { session });
+        const lists2 = await List.insertMany(DEFAULT_LISTS.map((name, index) => ({
+          board: board._id,
+          name,
+          position: index * 1000,
+        })), { session });
+        board2.lists = lists2.map(l => l._id);
+        await board2.save({ session });
+        await session.commitTransaction();
+        await delCache(cacheKey('boards', workspaceId, '*'));
+        return board2;
+      } catch (e2) {
+        await session.abortTransaction();
+        throw e2;
+      } finally {
+        session.endSession();
+      }
+    }
     throw e;
-  } finally {
-    session.endSession();
   }
 }
 

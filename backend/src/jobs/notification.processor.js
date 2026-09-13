@@ -20,6 +20,15 @@ export const notificationWorker = isTest ? null : createWorker('notifications', 
     case 'card-moved':
       await notifyCardMoved(data);
       break;
+    case 'workspace-join-request':
+      await notifyWorkspaceJoinRequest(data);
+      break;
+    case 'workspace-join-approved':
+      await notifyWorkspaceJoinApproved(data);
+      break;
+    case 'workspace-join-rejected':
+      await notifyWorkspaceJoinRejected(data);
+      break;
     default:
       console.log(`Unknown notification job: ${name}`);
   }
@@ -66,6 +75,39 @@ async function notifyCardMoved(data) {
     cardTitle: data.cardTitle,
     fromList: data.fromList,
     toList: data.toList,
+    read: false,
+    createdAt: new Date(),
+  });
+}
+
+async function notifyWorkspaceJoinRequest(data) {
+  await emitToUser(data.userId, SOCKET_EVENTS.NOTIFICATION_NEW, {
+    type: 'workspace-join-request',
+    workspaceId: data.workspaceId,
+    workspaceName: data.workspaceName,
+    workspaceSlug: data.workspaceSlug,
+    requestId: data.requestId,
+    requester: data.requester,
+    read: false,
+    createdAt: new Date(),
+  });
+}
+
+async function notifyWorkspaceJoinApproved(data) {
+  await emitToUser(data.userId, SOCKET_EVENTS.NOTIFICATION_NEW, {
+    type: 'workspace-join-approved',
+    workspaceId: data.workspaceId,
+    workspaceName: data.workspaceName,
+    read: false,
+    createdAt: new Date(),
+  });
+}
+
+async function notifyWorkspaceJoinRejected(data) {
+  await emitToUser(data.userId, SOCKET_EVENTS.NOTIFICATION_NEW, {
+    type: 'workspace-join-rejected',
+    workspaceId: data.workspaceId,
+    workspaceName: data.workspaceName,
     read: false,
     createdAt: new Date(),
   });

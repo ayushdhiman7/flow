@@ -115,8 +115,12 @@ export default function OnboardingWizard() {
       if (createWorkspaceStep.rejected.match(res)) return;
     }
     if (currentStep === 4) {
-      await dispatch(completeOnboarding({ userId, data }));
-      navigate("/dashboard", { replace: true });
+      const uid = userId || user?._id || user?.id;
+      const res = await dispatch(completeOnboarding({ userId: uid, data }));
+      // Navigate even if save fails — don't block user on localStorage error
+      if (completeOnboarding.fulfilled.match(res) || completeOnboarding.rejected.match(res)) {
+        navigate("/dashboard", { replace: true });
+      }
       return;
     }
     dispatch(nextStep());
@@ -195,7 +199,7 @@ export default function OnboardingWizard() {
               {currentStep === 1 && <ProfileStep user={user} data={data} onChange={(patch) => dispatch(updateData(patch))} fieldError={fieldErrors} />}
               {currentStep === 2 && <WorkspaceStep data={data} onChange={(patch) => dispatch(updateData(patch))} fieldError={fieldErrors} />}
               {currentStep === 3 && <PreferencesStep data={data} onChange={(patch) => dispatch(updateData(patch))} fieldError={fieldErrors} />}
-              {currentStep === 4 && <CompleteStep workspace={createdWorkspace || { name: data.workspace.name }} preferences={data.preferences} />}
+              {currentStep === 4 && <CompleteStep workspace={createdWorkspace || { name: data.workspace.name }} preferences={data.preferences} onNext={handleNext} />}
             </CardContent>
           </Card>
 
