@@ -5,39 +5,36 @@ A lightweight Notion/Trello/Slack-inspired SaaS built with modern tech stack.
 ## Tech Stack
 
 **Backend**
-- Express.js + TypeScript
-- MongoDB + Mongoose
-- Redis + BullMQ for job queues
+- Express.js (ESM) + Mongoose
+- MongoDB Atlas + Redis (cache + BullMQ job queues)
 - Socket.io for real-time
-- JWT Auth (access + refresh tokens)
-- RBAC (Owner/Admin/Member)
+- JWT Auth (httpOnly cookies: access + refresh tokens)
+- RBAC (Owner/Admin/Member, workspace-scoped)
+- Zod validation, Winston + Morgan logging, audit logs
 
 **Frontend**
-- React 19 + Vite 8 + TypeScript
-- Redux Toolkit + React-Redux
-- React Hook Form + Zod (zodResolver)
-- dnd-kit for drag & drop
-- Tailwind CSS 4 + dark mode (ThemeContext)
-- Socket.io client
-- PWA (vite-plugin-pwa + Workbox) offline queue
+- React 19 + Vite (JSX) + Redux Toolkit
+- React Hook Form + Zod on auth forms
+- dnd-kit for board drag & drop (optimistic with server reconcile)
+- Tailwind CSS 4 + Socket.io client
+- Served via nginx in Docker, static hosting ready (Vercel)
 
 **DevOps**
 - Docker + Docker Compose (healthchecks, multi-stage)
-- GitHub Actions CI/CD (lint → test → build → compose)
-- Swagger/OpenAPI docs (`/api-docs` + `docs/openapi.yaml`)
-- Winston + Morgan logging, Audit logs
+- `render.yaml` Blueprint for the API, `ui/vercel.json` SPA rewrites
+- GitHub Actions CI (lint → test → build)
+- Swagger/OpenAPI docs (`/api-docs`, `docs/openapi.yaml`)
 
 ## Features
 
-- **Authentication**: Register, login, JWT with refresh tokens, logout
-- **Workspaces**: Create, invite members, role management (owner/admin/member)
-- **Boards**: Kanban boards with customizable backgrounds
-- **Lists**: Create, reorder, archive lists
-- **Cards**: Create, move between lists, assign members, due dates, labels, comments
-- **Real-time**: Live updates via Socket.io (card moves, new messages, notifications)
-- **Chat**: Channels and DMs with real-time messaging
-- **Dark mode**: Persisted theme preference
-- **Optimistic UI**: Instant feedback with background sync
+- **Authentication**: Register, login, JWT with refresh tokens, logout, avatar upload, password change
+- **Workspaces**: Create, invite codes, join requests, role management (owner/admin/member)
+- **Boards**: Kanban boards with members, stats and full-board aggregation
+- **Lists**: Create, update, archive, reorder
+- **Cards**: Create, drag & drop between lists, assign members, due dates, labels, text search
+- **Notes**: Workspace notes with search and pinning
+- **Chat**: Channels and DMs (incl. join by code) with real-time messaging
+- **Real-time**: Live updates via Socket.io (card moves, messages, notifications, presence)
 
 ## Quick Start
 
@@ -58,7 +55,7 @@ cp backend/.env.example backend/.env
 docker compose up -d --wait
 
 # Access:
-# Frontend: http://localhost:5173 (PWA offline capable)
+# Web (nginx): http://localhost:5174
 # Backend API: http://localhost:3000
 # API Docs: http://localhost:3000/api-docs
 # Health: http://localhost:3000/health
@@ -67,25 +64,24 @@ docker compose up -d --wait
 ### Local Development
 
 ```bash
-# Terminal 1 - Backend
-cd backend
-cp .env.example .env
-npm install
-npm run dev
+# Terminal 1 - MongoDB & Redis
+docker compose up mongo redis -d
 
-# Terminal 2 - Frontend
+# Terminal 2 - Backend
+cd backend
+cp .env.example .env   # once
+npm install
+npm run dev            # node --watch
+
+# Terminal 3 - Frontend
 cd ui
 npm install
-npm run dev
-
-# Terminal 3 - MongoDB & Redis (or use Docker)
-docker run -d -p 27017:27017 --name mongo mongo:7
-docker run -d -p 6379:6379 --name redis redis:7-alpine
+npm run dev            # http://localhost:5173
 ```
 
 ## Environment Variables
 
-### Backend (.env)
+### Backend (`backend/.env`)
 ```env
 NODE_ENV=development
 PORT=3000
@@ -98,85 +94,120 @@ JWT_REFRESH_EXPIRY=7d
 CORS_ORIGIN=http://localhost:5173
 ```
 
+### Frontend (`ui/.env`)
+```env
+VITE_API_URL=http://localhost:3000/api
+```
+
+## Deployment (Render + Vercel + Atlas)
+
+**Backend → Render** (Blueprint in `render.yaml`, or manual Web Service
+with Root Directory `backend`, Build `npm ci`, Start `node src/app.js`):
+- `NODE_ENV=production`, `MONGO_URI` (Atlas SRV string), `REDIS_URL` (Upstash),
+  `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` (32+ chars each),
+  `CORS_ORIGIN=https://<your-app>.vercel.app`
+- Atlas → Network Access must allow Render (`0.0.0.0/0`; auth still via DB user)
+- The API serves `/health` for Render health checks and sets `trust proxy`
+  for correct rate-limiting and secure cookies behind the proxy
+
+**Frontend → Vercel**: set Project **Root Directory to `ui`** and
+`VITE_API_URL=https://<your-render-api>.onrender.com/api`
+(`ui/vercel.json` already handles SPA rewrites for React Router).
+
+**Notes:** Render free tier sleeps when idle (slow first request); uploaded
+avatars live on ephemeral disk and are lost on redeploy.
+
 ## API Endpoints
 
-### Auth
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login
-- `POST /api/auth/refresh` - Refresh access token
-- `POST /api/auth/logout` - Logout
-- `GET /api/auth/me` - Get current user
-- `PUT /api/auth/me` - Update profile
+### Auth (`/api/auth`)
+- `POST /register` - Register new user
+- `POST /login` - Login
+- `POST /refresh` - Refresh access token
+- `POST /logout` - Logout
+- `GET /me` - Get current user
+- `PUT /me` - Update profile
+- `POST /me/avatar` - Upload avatar
+- `PUT /me/password` - Change password
 
-### Workspaces
-- `GET /api/workspaces` - List workspaces
-- `POST /api/workspaces` - Create workspace
-- `GET /api/workspaces/:id` - Get workspace
-- `PUT /api/workspaces/:id` - Update workspace
-- `DELETE /api/workspaces/:id` - Delete workspace
-- `POST /api/workspaces/:id/members` - Invite member
-- `PUT /api/workspaces/:id/members/:userId` - Update member role
-- `DELETE /api/workspaces/:id/members/:userId` - Remove member
+### Workspaces (`/api/workspaces`)
+- `GET /` - List workspaces
+- `POST /` - Create workspace
+- `POST /join-by-code` - Join via invite code
+- `GET /:id` - Get workspace
+- `PUT /:id` - Update workspace (owner)
+- `DELETE /:id` - Delete workspace (owner)
+- `POST /:id/members` - Invite member
+- `PUT /:id/members/:userId` - Update member role
+- `DELETE /:id/members/:userId` - Remove member
+- `GET /:id/requests` + `POST /:id/requests/:requestId/handle` - Join requests
 
-### Boards
-- `GET /api/workspaces/:workspaceId/boards` - List boards
-- `POST /api/workspaces/:workspaceId/boards` - Create board
-- `GET /api/boards/:id` - Get board
-- `GET /api/boards/:id/full` - Get board with lists & cards
-- `PUT /api/boards/:id` - Update board
-- `DELETE /api/boards/:id` - Delete board
+### Boards (`/api/workspaces/:workspaceId/boards`)
+- `GET /` - List boards
+- `POST /` - Create board (starts with To Do / In Progress / Done)
+- `GET /:id` - Get board
+- `GET /:id/full` - Board with lists & cards (aggregation)
+- `GET /:id/stats` - Board stats
+- `PUT /:id` - Update board (admin/owner)
+- `DELETE /:id` - Delete board (admin/owner)
+- `POST /:id/members` - Add board member (admin/owner)
+- `DELETE /:id/members/:userId` - Remove board member (admin/owner)
 
-### Lists
-- `GET /api/boards/:boardId/lists` - List lists
-- `POST /api/boards/:boardId/lists` - Create list
-- `PUT /api/lists/:id` - Update list
-- `DELETE /api/lists/:id` - Delete list
-- `POST /api/boards/:boardId/lists/reorder` - Reorder lists
+### Lists (`/api/boards/:boardId/lists`)
+- `GET /` - List lists
+- `POST /` - Create list
+- `GET /:id` - Get list
+- `PUT /:id` - Update list (admin/owner)
+- `DELETE /:id` - Delete list (admin/owner)
+- `POST /reorder` - Reorder lists (admin/owner)
 
-### Cards
-- `GET /api/lists/:listId/cards` - List cards (paginated)
-- `POST /api/lists/:listId/cards` - Create card
-- `GET /api/cards/:id` - Get card
-- `PUT /api/cards/:id` - Update card
-- `PATCH /api/cards/:id/move` - Move card
-- `DELETE /api/cards/:id` - Delete card
-- `POST /api/cards/:id/assignees` - Add assignees
-- `DELETE /api/cards/:id/assignees/:assigneeId` - Remove assignee
+### Cards (`/api/lists/:listId/cards`)
+- `GET /` - List cards (paginated, `search` supported)
+- `POST /` - Create card
+- `GET /:id` - Get card
+- `PUT /:id` - Update card (admin/owner)
+- `DELETE /:id` - Delete card (admin/owner)
+- `PATCH /:id/move` - Move card (`{ listId, position }`)
+- `POST /:id/assignees` - Add assignees (admin/owner)
+- `DELETE /:id/assignees/:assigneeId` - Remove assignee (admin/owner)
 
-### Chat
-- `GET /api/workspaces/:workspaceId/channels` - List channels
-- `POST /api/workspaces/:workspaceId/channels` - Create channel
-- `POST /api/workspaces/:workspaceId/channels/dm` - Create DM
-- `GET /api/channels/:id/messages` - Get messages (paginated)
-- `POST /api/channels/:id/messages` - Send message
+### Chat (`/api/workspaces/:workspaceId/channels`)
+- `GET /` - List channels
+- `POST /` - Create channel
+- `POST /dm` - Create DM
+- `POST /dm-by-code` - Create DM by user code
+- `GET /:id` - Get channel
+- `GET /:id/messages` - Get messages (paginated)
+- `POST /:id/messages` - Send message
+
+### Notes (`/api/workspaces/:workspaceId/notes`)
+- `GET /` - List notes (`search`, `isPinned` supported)
+- `POST /` - Create note
+- `GET /:id` - Get note
+- `PUT /:id` - Update note
+- `DELETE /:id` - Delete note
 
 ## Real-time Events
 
 ### Socket.io Connection
 ```javascript
-const socket = io('http://localhost:3000', {
-  auth: { token: 'your-access-token' }
+import { io } from 'socket.io-client';
+const socket = io('https://<your-render-api>.onrender.com', {
+  auth: { token: 'your-access-token' },
+  withCredentials: true,
 });
 ```
 
 ### Client → Server
-- `join:workspace` (workspaceId)
-- `join:board` (boardId)
-- `join:channel` (channelId)
-- `leave:workspace` (workspaceId)
-- `leave:board` (boardId)
-- `leave:channel` (channelId)
+- `join:workspace` (workspaceId) / `leave:workspace`
+- `join:board` (boardId) / `leave:board`
+- `join:channel` (channelId) / `leave:channel`
 - `presence:update` ({ status: 'online' | 'away' | 'busy' })
 
 ### Server → Client
-- `card:created` ({ card })
-- `card:moved` ({ card, fromList })
-- `card:updated` ({ card })
-- `card:deleted` ({ cardId })
-- `card:assigned` ({ card, assignees })
+- `card:created` / `card:moved` ({ card, fromList }) / `card:updated` / `card:deleted` / `card:assigned`
 - `message:new` ({ message })
 - `notification:new` ({ notification })
-- `presence:update` ({ userId, status })
+- `presence:update` / `user:joined` / `user:left`
 
 ## Project Structure
 
@@ -187,36 +218,40 @@ flow/
 │   │   ├── config/          # DB, Redis, Queue, Logger, Env
 │   │   ├── middleware/      # Auth, RBAC, Audit, Error, Validate, Upload
 │   │   ├── modules/
-│   │   │   ├── auth/        # Auth + JWT + Session
-│   │   │   ├── workspaces/  # Workspace CRUD + members (cached)
-│   │   │   ├── boards/      # Board CRUD + aggregations + stats
-│   │   │   ├── lists/       # List CRUD + reorder (transaction)
-│   │   │   ├── cards/       # Card CRUD + move (transaction) + search + assignees
-│   │   │   ├── chat/        # Channels + DM + messages
-│   │   │   ├── notes/       # Notes + text search
+│   │   │   ├── auth/        # Auth + JWT cookies + sessions + avatar
+│   │   │   ├── workspaces/  # Workspace CRUD + members + join requests
+│   │   │   ├── boards/      # Board CRUD + full aggregation + stats
+│   │   │   ├── lists/       # List CRUD + reorder
+│   │   │   ├── cards/       # Card CRUD + move + search + assignees
+│   │   │   ├── chat/        # Channels + DMs + messages
+│   │   │   ├── notes/       # Notes + search
 │   │   │   └── audit/       # AuditLog model
 │   │   ├── socket/          # Socket.io handlers (rooms)
 │   │   ├── jobs/            # BullMQ processors (email, notifications)
 │   │   ├── utils/           # JWT, constants, helpers
-│   │   └── app.js           # Express app (morgan, helmet, swagger)
-│   └── tests/               # API tests (auth, workspace, board)
+│   │   └── app.js           # Express app (trust proxy, helmet, swagger)
+│   ├── Dockerfile
+│   └── tests/               # API tests (auth, workspace)
 ├── ui/
 │   ├── src/
-│   │   ├── app/             # Store, ThemeContext, OfflineQueue
-│   │   ├── api/             # Fetch client (offline queue)
-│   │   ├── components/      # Shared UI + ErrorBoundary + OfflineBanner
-│   │   ├── features/        # Auth (RHF+zod), Board (dnd, optimistic), Chat (infinite scroll), etc.
-│   │   ├── layouts/         # AppLayout (dark toggle) + AuthLayout
+│   │   ├── app/             # Redux store
+│   │   ├── api/             # Fetch client (GET/POST/PUT/PATCH/DELETE)
+│   │   ├── lib/             # ids, avatar, slug, utils
+│   │   ├── components/      # Shared UI primitives
+│   │   ├── features/        # Auth, Board (dnd, optimistic), Chat, Notes, ...
+│   │   ├── layouts/         # AppLayout + AuthLayout
 │   │   ├── routes/          # AppRoutes + guards
 │   │   └── test/            # Vitest setup + smoke tests
 │   ├── nginx.conf
+│   ├── vercel.json          # SPA rewrites
 │   └── Dockerfile           # Multi-stage nginx
 ├── docs/
-│   ├── architecture.md      # Mermaid architecture diagrams
-│   ├── er-diagram.md        # Mermaid ERD + indexes
-│   └── openapi.yaml         # Swagger export (52 endpoints)
+│   ├── architecture.md
+│   ├── er-diagram.md
+│   └── openapi.yaml
+├── render.yaml              # Render Blueprint (API)
 ├── docker-compose.yml       # mongo/redis/api/web with healthchecks
-└── .github/workflows/ci.yml # lint → test → build → compose
+└── .github/workflows/ci.yml # lint → test → build
 ```
 
 ## Development
@@ -239,25 +274,16 @@ cd backend && npm run lint
 cd ui && npm run lint
 ```
 
-### Code Formatting
-```bash
-# Backend
-cd backend && npm run format
-
-# Frontend
-cd ui && npm run format
-```
-
 ## Architecture
 
 > See `docs/architecture.md` (Mermaid) and `docs/er-diagram.md` for detailed diagrams.
-> Swagger: `http://localhost:3000/api-docs` or `docs/openapi.yaml` (52 endpoints, 7 tags).
+> Swagger: `/api-docs` when the API is running, or `docs/openapi.yaml`.
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │   Frontend  │────▶│   Backend   │────▶│   MongoDB   │
-│ React 19+Vite│     │  Express    │     │             │
-│ PWA/Offline  │     │  RBAC/Cache │     │ Aggregations│
+│ React + Vite│     │  Express    │     │  Atlas      │
+│ Redux + dnd │     │  RBAC/Cache │     │ Aggregations│
 └─────────────┘     └──────┬──────┘     └─────────────┘
                            │
                     ┌──────┴──────┐
@@ -268,14 +294,9 @@ cd ui && npm run format
                            │
                     ┌──────┴──────┐
                     │  Socket.io  │
-                    │  (Real-time)│
+                    │ (Real-time) │
                     └─────────────┘
 ```
-
-### Key Enhancements (P1/P2/P3)
-- **P1 Backend:** RBAC middleware wired (`authorizeWorkspace`), Redis cache (`boards`, `board:full`, `workspaces` with SCAN invalidation), Transactions (`moveCard`, `reorderLists`), Card `$text` + regex search, Swagger 52 endpoints, Winston + Morgan logging.
-- **P2 Frontend:** RHF+zod on auth forms, Dark Mode (`ThemeContext` + localStorage), Infinite Scroll (`IntersectionObserver`), PWA + Workbox offline queue.
-- **P3 Deliverables:** `docs/architecture.md`, `docs/er-diagram.md`, `docs/openapi.yaml`, `ui/Dockerfile` + `nginx.conf`, `docker-compose` healthchecks, CI green, coverage fix.
 
 ## Commit Convention
 

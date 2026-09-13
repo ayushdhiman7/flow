@@ -9,15 +9,13 @@ Mini SaaS inspired by Notion/Trello/Slack built with Express + MongoDB + Redis +
 graph TB
     subgraph Client["Frontend (React 19 + Vite)"]
         UI["React Components<br/>Board / Notes / Chat"]
-        Store["Redux Toolkit<br/>Zustand stores"]
-        PWA["PWA Service Worker<br/>Workbox"]
+        Store["Redux Toolkit<br/>slices + thunks"]
         RHF["React Hook Form + Zod"]
         DnD["dnd-kit Drag&Drop"]
-        Theme["ThemeContext<br/>Dark Mode"]
     end
 
     subgraph Server["Backend (Express + Node 20)"]
-        API["REST API (52 endpoints)<br/>Swagger /api-docs"]
+        API["REST API<br/>Swagger /api-docs"]
         AuthMW["Auth / RBAC / Validate<br/>Helmet + RateLimit"]
         CacheMW["Redis Cache<br/>flow:workspaces / board:full"]
         AuditMW["Audit Log<br/>morgan + winston"]
@@ -46,7 +44,6 @@ graph TB
     API --> Queue --> Redis
     Queue --> Socket
     Socket --> Store
-    PWA -.-> API
 
     style Client fill:#e0f2fe,stroke:#0284c7
     style Server fill:#fef3c7,stroke:#d97706
@@ -59,15 +56,13 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant U as Browser
-    participant PWA as ServiceWorker
     participant API as Express
     participant Cache as Redis Cache
     participant DB as MongoDB
     participant Q as BullMQ
     participant S as Socket.io
 
-    U->>PWA: fetch /api/workspaces
-    PWA->>API: GET /api/workspaces (NetworkFirst)
+    U->>API: GET /api/workspaces
     API->>Cache: getCache flow:workspaces:{userId}
     alt cache hit
         Cache-->>API: cached workspaces
@@ -90,10 +85,10 @@ graph LR
     Validation["Zod Validation<br/>validate middleware"]
     Auth["authenticate<br/>JWT cookie + Bearer"]
     RBAC["authorizeWorkspace<br/>owner>admin>member"]
-    Service["Services<br/>workspace.service<br/>board.service w/ Transaction<br/>card.service w/ $text search"]
+    Service["Services<br/>workspace.service<br/>board.service<br/>card.service w/ $text search"]
     Cache["Redis Cache<br/>SCAN delCache"]
     Aggregation["Mongo Aggregations<br/>getBoardFull $lookup + $project<br/>getBoardStats $group $cond"]
-    Transaction["Transactions<br/>createBoard<br/>moveCard<br/>reorderLists"]
+    Transaction["Transactions<br/>createBoard<br/>reorderLists"]
     SocketLayer["Socket + Audit<br/>auditLog + winston/morgan"]
 
     Routes --> Validation --> Auth --> RBAC --> Service

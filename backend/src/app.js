@@ -8,11 +8,16 @@ import morgan from 'morgan';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { env, connectDB, connectRedis, disconnectDB, disconnectRedis, closeQueues, isTest } from './config/index.js';
 import { logger, stream } from './config/logger.js';
 import { errorHandler, notFound } from './middleware/error.js';
 import { authenticate, optionalAuth } from './middleware/auth.js';
 import { auditLog } from './middleware/audit.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import authRoutes from './modules/auth/auth.routes.js';
 import workspaceRoutes from './modules/workspaces/workspace.routes.js';
@@ -34,19 +39,42 @@ app.use(morgan(isTest ? 'tiny' : 'combined', {
 }));
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+const allowedOrigins = env.CORS_ORIGIN.split(",").map(s => s.trim()).filter(Boolean);
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(null, false);
+  },
+  credentials: true,
+}));
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+// Required behind Render/proxies: correct client IPs for rate-limit
+// and secure cross-site cookies.
+app.set('trust proxy', 1);
 
 const limiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
   max: env.RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path === '/health' || req.path === '/api/health',
+  message: { error: 'Too many requests, please try again later.' },
 });
 app.use('/api/', limiter);
+
+// Separate stricter limiter for auth brute-force
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many auth attempts, try again in 15 minutes.' },
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 
 const swaggerOptions = {
   definition: {
@@ -74,6 +102,13 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Serve uploaded avatars statically
+app.use('/uploads', express.static(path.resolve(process.cwd(), env.UPLOAD_DIR || './uploads'), {
+  setHeaders: (res) => {
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+  },
+}));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/workspaces', auditLog('workspace:access', 'workspace'), workspaceRoutes);

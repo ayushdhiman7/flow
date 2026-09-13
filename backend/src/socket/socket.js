@@ -6,9 +6,11 @@ import { SOCKET_EVENTS } from '../utils/constants.js';
 let io;
 
 export function initSocket(server) {
+  // CORS_ORIGIN may be a comma-separated list — socket.io needs an array.
+  const origins = String(env.CORS_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
   io = new Server(server, {
     cors: {
-      origin: env.CORS_ORIGIN,
+      origin: origins.length > 1 ? origins : (origins[0] || true),
       credentials: true,
     },
   });
@@ -38,6 +40,8 @@ export function initSocket(server) {
 
   io.on('connection', (socket) => {
     console.log(`User connected: ${socket.user.id} (${socket.id})`);
+    // join personal room for cross-workspace direct emits
+    socket.join(`user:${socket.user.id}`);
 
     socket.on('join:workspace', (workspaceId) => {
       socket.join(`workspace:${workspaceId}`);
