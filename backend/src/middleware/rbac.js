@@ -29,13 +29,32 @@ async function resolveWorkspaceId(req) {
     const board = await Board.findById(req.params.boardId).select('workspace');
     return board?.workspace?.toString() || null;
   }
-  if (req.params.listId) {
+  let listId = req.params.listId;
+  if (!listId) {
+    const m = (req.baseUrl + req.path).match(/\/lists\/([0-9a-fA-F]{24})/) || req.originalUrl.match(/\/lists\/([0-9a-fA-F]{24})/);
+    if (m) listId = m[1];
+  }
+  if (listId) {
     const { List } = await import('../modules/lists/list.model.js');
-    const list = await List.findById(req.params.listId).select('board');
-    if (!list) return null;
-    const { Board } = await import('../modules/boards/board.model.js');
-    const board = await Board.findById(list.board).select('workspace');
-    return board?.workspace?.toString() || null;
+    let list = null;
+    try { list = await List.findById(listId).select('board'); } catch { list = null; }
+    if (list) {
+      const { Board } = await import('../modules/boards/board.model.js');
+      const board = await Board.findById(list.board).select('workspace');
+      if (board?.workspace) return board.workspace.toString();
+    }
+    // fallback: for card move, target list is in body
+    if (req.body?.listId) {
+      const { List: List2 } = await import('../modules/lists/list.model.js');
+      let tList = null;
+      try { tList = await List2.findById(req.body.listId).select('board'); } catch { tList = null; }
+      if (tList) {
+        const { Board } = await import('../modules/boards/board.model.js');
+        const board2 = await Board.findById(tList.board).select('workspace');
+        if (board2?.workspace) return board2.workspace.toString();
+      }
+    }
+    return null;
   }
   if (req.params.id && req.baseUrl.includes('/boards/')) {
     const { Board } = await import('../modules/boards/board.model.js');
@@ -69,7 +88,8 @@ export function authorizeWorkspace(...allowedRoles) {
       }
       if (!workspaceRole) return res.status(403).json({ error: 'Not a member of this workspace' });
       const userLevel = roleHierarchy[workspaceRole] || 0;
-      const requiredLevel = Math.max(...allowedRoles.map(r => roleHierarchy[r] || 0));
+      // allow if user has at least the lowest required role (e.g. member can read where member/admin/owner allowed)
+      const requiredLevel = Math.min(...allowedRoles.map(r => roleHierarchy[r] || 0));
       if (userLevel < requiredLevel) {
         return res.status(403).json({ error: 'Insufficient workspace permissions' });
       }

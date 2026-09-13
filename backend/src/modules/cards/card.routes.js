@@ -3,7 +3,7 @@ import * as ctrl from './card.controller.js';
 import { authenticate } from '../../middleware/auth.js';
 import { authorizeWorkspace } from '../../middleware/rbac.js';
 import { validate } from '../../middleware/validate.js';
-import { createCardSchema, updateCardSchema, moveCardSchema, addAssigneesSchema, cardIdSchema, getCardsSchema } from './card.validation.js';
+import { createCardSchema, updateCardSchema, moveCardSchema, moveCardParamsSchema, addAssigneesSchema, cardIdSchema, getCardsSchema } from './card.validation.js';
 
 const router = Router({ mergeParams: true });
 
@@ -110,7 +110,7 @@ router.delete('/:id', validate(cardIdSchema), authorizeWorkspace('admin', 'owner
  *     responses:
  *       200: { description: Moved }
  */
-router.patch('/:id/move', validate(cardIdSchema), validate(moveCardSchema), authorizeWorkspace('admin', 'owner'), ctrl.moveCard);
+router.patch('/:id/move', validate(moveCardParamsSchema), authorizeWorkspace('member', 'admin', 'owner'), ctrl.moveCard);
 
 /**
  * @swagger

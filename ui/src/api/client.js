@@ -34,39 +34,33 @@ function getErrorMessage(data, fallback) {
   return fallback;
 }
 
-import { enqueueOfflineRequest } from "@/app/offlineQueue";
-
 export async function apiFetch(path, { method = "GET", body, headers = {}, credentials = "include", ...rest } = {}) {
   const url = `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
 
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
   const opts = {
     method,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...headers,
     },
     credentials,
     ...rest,
   };
+  // For FormData let browser set Content-Type with boundary
+  if (isFormData && opts.headers["Content-Type"]?.includes("application/json")) {
+    delete opts.headers["Content-Type"];
+  }
 
   if (body !== undefined) {
-    opts.body = typeof body === "string" ? body : JSON.stringify(body);
+    if (isFormData) opts.body = body;
+    else opts.body = typeof body === "string" ? body : JSON.stringify(body);
   }
 
   let res;
   try {
     res = await fetch(url, opts);
   } catch (err) {
-    // offline: queue mutating requests
-    const isMutating = !["GET", "HEAD"].includes(method.toUpperCase());
-    if (isMutating && typeof navigator !== "undefined" && !navigator.onLine) {
-      enqueueOfflineRequest(path, { method, body, headers, credentials, ...rest });
-      const error = new Error("You are offline — request queued and will sync when back online.");
-      error.status = 0;
-      error.offlineQueued = true;
-      error.original = err;
-      throw error;
-    }
     const error = new Error("Network error. Please check your connection.");
     error.status = 0;
     error.original = err;
@@ -98,5 +92,6 @@ export const api = {
   get: (path, opts) => apiFetch(path, { ...opts, method: "GET" }),
   post: (path, body, opts) => apiFetch(path, { ...opts, method: "POST", body }),
   put: (path, body, opts) => apiFetch(path, { ...opts, method: "PUT", body }),
+  patch: (path, body, opts) => apiFetch(path, { ...opts, method: "PATCH", body }),
   delete: (path, opts) => apiFetch(path, { ...opts, method: "DELETE" }),
 };

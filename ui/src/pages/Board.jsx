@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, AlertCircle, Loader2, Layers, Kanban } from "lucide-react";
 import BoardColumn from "@/features/board/components/BoardColumn";
 import TaskCard from "@/features/board/components/TaskCard";
+import { isObjectId } from "@/lib/ids";
 
 export default function BoardPage() {
   const dispatch = useDispatch();
@@ -52,7 +53,7 @@ export default function BoardPage() {
   useEffect(()=>{ if(workspaceId && currentBoardId) dispatch(fetchBoardFull({ workspaceId, boardId: currentBoardId})); },[dispatch, workspaceId, currentBoardId]);
 
   const handleCreateBoard = async (e) => {
-    e.preventDefault(); if(!boardName.trim()) return;
+    e.preventDefault(); if(!boardName.trim() || loading) return;
     const res = await dispatch(createBoard({ workspaceId, name: boardName.trim()}));
     if(createBoard.fulfilled.match(res)){ setBoardName(""); setCreateBoardOpen(false); dispatch(fetchBoardFull({workspaceId, boardId: res.payload.board._id})); }
   };
@@ -63,7 +64,8 @@ export default function BoardPage() {
   };
   const openAddTask = (list) => { setTaskDialog({ list, card:null}); setTaskTitle(""); setTaskDesc(""); };
   const openEditTask = (card) => {
-    const list = lists.find(l=> l.cards.some(c=>c._id===card._id));
+    const list = lists.find(l=> (l.cards||[]).some(c=>String(c._id)===String(card._id)));
+    if(!list) return;
     setTaskDialog({ list, card}); setTaskTitle(card.title); setTaskDesc(card.description||"");
   };
   const handleSaveTask = async (e)=>{
@@ -78,32 +80,82 @@ export default function BoardPage() {
   const handleDeleteAsk = (card)=> setDeleteConfirm(card);
   const handleDeleteConfirm = async ()=>{
     const card = deleteConfirm;
-    const list = lists.find(l=> l.cards.some(c=>c._id===card._id));
+    const list = lists.find(l=> (l.cards||[]).some(c=>String(c._id)===String(card._id)));
+    if(!list) { setDeleteConfirm(null); return; }
     await dispatch(deleteCard({ listId: list._id, cardId: card._id}));
     setDeleteConfirm(null);
   };
 
   const handleDragStart = (e)=> {
-    const cardId = e.active.id;
-    for(const l of lists){ const c = l.cards.find(x=> x._id===cardId); if(c) { setActiveCard(c); break; } }
+    const fromData = e.active?.data?.current?.card;
+    if (fromData) { setActiveCard(fromData); return; }
+    const cardId = String(e.active.id);
+    for(const l of lists){ const c = (l.cards||[]).find(x=> String(x._id)===cardId); if(c) { setActiveCard(c); break; } }
   };
   const handleDragEnd = async (e)=>{
     const { active, over } = e;
     setActiveCard(null);
     if(!over) return;
-    const activeId = active.id;
-    const overId = over.id;
-    let fromListId=null, toListId=null, overCard=null;
-    for(const l of lists){ if(l.cards.some(c=>c._id===activeId)) fromListId=l._id; if(l.cards.some(c=>c._id===overId)) { toListId=l._id; overCard=l.cards.find(c=>c._id===overId);} if(l._id===overId) toListId=l._id; }
-    if(!fromListId || !toListId) return;
-    if(fromListId===toListId && activeId===overId) return;
-    const targetList = lists.find(l=> l._id===toListId);
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    if(activeId===overId) return;
+
+    // Index-based resolution: over is either a column (list id) or a card.
+    const cardToList = new Map();
+    const listIds = new Set();
+    const listById = new Map();
+    for(const l of lists){
+      const lid = String(l._id);
+      if(!isObjectId(lid)) continue;
+      listIds.add(lid);
+      listById.set(lid, l);
+      for(const c of (l.cards||[])) cardToList.set(String(c._id), lid);
+    }
+    const fromListId = cardToList.get(activeId);
+    if(!fromListId) return;
+    let toListId;
+    let overCard = null;
+    if(listIds.has(overId)) {
+      toListId = overId;
+    } else if(cardToList.has(overId)) {
+      toListId = cardToList.get(overId);
+      overCard = (listById.get(toListId).cards||[]).find(c=>String(c._id)===overId) || null;
+    } else {
+      return;
+    }
+    const targetList = listById.get(toListId);
+    if(!targetList) return;
+    const sorted = [...(targetList.cards||[])].sort((a,b)=> (Number(a.position)||0)-(Number(b.position)||0));
     let position;
-    if(targetList.cards.length===0) position = 1000;
-    else if(overCard) position = overCard.position;
-    else { const last = targetList.cards[targetList.cards.length-1]; position = (last?.position||0)+1000; }
+    if(sorted.length===0) {
+      position = 1000;
+    } else if(fromListId!==toListId) {
+      // Cross-list: land on the hovered card's slot (server shifts room),
+      // else append at the end.
+      if(overCard) position = Number(overCard.position) || 1000;
+      else { const last = sorted[sorted.length-1]; position = (Number(last?.position)||0)+1000; }
+    } else {
+      // Same-list reorder: midpoint between neighbours for a stable order.
+      const overIdx = sorted.findIndex(c=>String(c._id)===(overCard ? String(overCard._id) : overId));
+      const activeIdx = sorted.findIndex(c=>String(c._id)===activeId);
+      if(overIdx===-1 || activeIdx===-1 || overIdx===activeIdx) return;
+      if(activeIdx < overIdx) {
+        const cur = Number(sorted[overIdx].position)||0;
+        const nxt = sorted[overIdx+1] ? Number(sorted[overIdx+1].position) : null;
+        position = nxt==null ? cur+500 : cur+(nxt-cur)/2;
+      } else {
+        const cur = Number(sorted[overIdx].position)||0;
+        const prv = sorted[overIdx-1] ? Number(sorted[overIdx-1].position) : null;
+        position = prv==null ? cur-500 : prv+(cur-prv)/2;
+      }
+      if(!Number.isFinite(position)) position = Number(sorted[overIdx].position)||1000;
+    }
+    if(!isObjectId(fromListId) || !isObjectId(toListId)) return;
     dispatch(optimisticMove({ cardId: activeId, fromListId, toListId, position }));
-    await dispatch(moveCard({ cardId: activeId, fromListId, toListId, position }));
+    const res = await dispatch(moveCard({ cardId: activeId, fromListId, toListId, position }));
+    if (moveCard.rejected.match(res)) return;
+    // Reconcile with server truth (positions of shifted siblings).
+    if(workspaceId && currentBoardId) dispatch(fetchBoardFull({workspaceId, boardId: currentBoardId}));
   };
 
   if(!workspaceId){
@@ -127,7 +179,7 @@ export default function BoardPage() {
         </CardContent></Card>
         <Dialog open={createBoardOpen} onOpenChange={setCreateBoardOpen}>
           <DialogContent onClose={()=>setCreateBoardOpen(false)} className="rounded-2xl"><DialogHeader><DialogTitle>New board</DialogTitle></DialogHeader>
-          <form onSubmit={handleCreateBoard} className="space-y-5"><div className="space-y-2"><Label>Board name</Label><Input value={boardName} onChange={e=>setBoardName(e.target.value)} placeholder="Product roadmap" maxLength={50} className="h-11 rounded-xl"/></div><DialogFooter><Button type="button" variant="outline" onClick={()=>setCreateBoardOpen(false)} className="rounded-xl">Cancel</Button><Button type="submit" className="rounded-xl bg-zinc-900 hover:bg-zinc-800">Create</Button></DialogFooter></form>
+          <form onSubmit={handleCreateBoard} className="space-y-5"><div className="space-y-2"><Label>Board name</Label><Input value={boardName} onChange={e=>setBoardName(e.target.value)} placeholder="Product roadmap" maxLength={50} className="h-11 rounded-xl" disabled={loading} /></div><DialogFooter><Button type="button" variant="outline" onClick={()=>setCreateBoardOpen(false)} className="rounded-xl" disabled={loading}>Cancel</Button><Button type="submit" className="rounded-xl bg-zinc-900 hover:bg-zinc-800" disabled={loading || !boardName.trim()}>{loading && <Loader2 className="h-4 w-4 animate-spin"/>} Create</Button></DialogFooter></form>
           </DialogContent>
         </Dialog>
       </div>
@@ -176,7 +228,7 @@ export default function BoardPage() {
 
       <Dialog open={createBoardOpen} onOpenChange={setCreateBoardOpen}>
         <DialogContent onClose={()=>setCreateBoardOpen(false)} className="rounded-2xl"><DialogHeader><DialogTitle>New board</DialogTitle></DialogHeader>
-        <form onSubmit={handleCreateBoard} className="space-y-5"><div className="space-y-2"><Label>Board name</Label><Input value={boardName} onChange={e=>setBoardName(e.target.value)} placeholder="Product roadmap" maxLength={50} className="h-11 rounded-xl"/></div><DialogFooter><Button type="button" variant="outline" onClick={()=>setCreateBoardOpen(false)} className="rounded-xl">Cancel</Button><Button type="submit" className="rounded-xl bg-zinc-900 hover:bg-zinc-800">Create</Button></DialogFooter></form>
+        <form onSubmit={handleCreateBoard} className="space-y-5"><div className="space-y-2"><Label>Board name</Label><Input value={boardName} onChange={e=>setBoardName(e.target.value)} placeholder="Product roadmap" maxLength={50} className="h-11 rounded-xl" disabled={loading} /></div><DialogFooter><Button type="button" variant="outline" onClick={()=>setCreateBoardOpen(false)} className="rounded-xl" disabled={loading}>Cancel</Button><Button type="submit" className="rounded-xl bg-zinc-900 hover:bg-zinc-800" disabled={loading || !boardName.trim()}>{loading && <Loader2 className="h-4 w-4 animate-spin"/>} Create</Button></DialogFooter></form>
         </DialogContent>
       </Dialog>
 

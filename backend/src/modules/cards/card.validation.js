@@ -24,10 +24,22 @@ export const updateCardSchema = z.object({
   }),
 });
 
+const objectId = (msg = 'Invalid ID format') => z.string().regex(/^[0-9a-fA-F]{24}$/, msg);
+
 export const moveCardSchema = z.object({
   body: z.object({
-    listId: z.string().regex(/^[0-9a-fA-F]{24}$/),
-    position: z.number(),
+    listId: objectId(),
+    position: z.coerce.number(),
+  }),
+});
+
+// Single schema for PATCH /:id/move: validates URL card id AND body together,
+// so one validate() call can't clobber parent-router params (listId).
+export const moveCardParamsSchema = z.object({
+  params: z.object({ id: objectId() }),
+  body: z.object({
+    listId: objectId(),
+    position: z.coerce.number(),
   }),
 });
 

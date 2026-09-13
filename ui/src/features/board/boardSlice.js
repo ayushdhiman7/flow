@@ -100,13 +100,13 @@ const boardSlice = createSlice({
       state._snapshot = JSON.parse(JSON.stringify(state.lists));
       let cardToMove = null;
       for (const list of state.lists) {
-        const idx = list.cards.findIndex(c => c._id === cardId);
+        const idx = (list.cards||[]).findIndex(c => String(c._id) === String(cardId));
         if (idx !== -1) { cardToMove = list.cards.splice(idx, 1)[0]; break; }
       }
       if (!cardToMove) return;
       cardToMove.list = toListId;
       cardToMove.position = position;
-      const target = state.lists.find(l => l._id === toListId);
+      const target = state.lists.find(l => String(l._id) === String(toListId));
       if (target) {
         // insert roughly ordered by position
         target.cards.push(cardToMove);

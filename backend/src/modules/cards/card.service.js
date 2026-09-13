@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Card } from './card.model.js';
 import { List } from '../lists/list.model.js';
 import { Board } from '../boards/board.model.js';
@@ -109,46 +110,42 @@ export async function updateCard(cardId, userId, data) {
 }
 
 export async function moveCard(cardId, userId, { listId, position }) {
+  // Fail fast with a named 400 before any DB call: a Mongoose CastError
+  // would otherwise surface as a generic "Invalid ID format".
+  if (!mongoose.isValidObjectId(cardId)) throw new AppError('Invalid card ID', 400);
+  if (!mongoose.isValidObjectId(listId)) throw new AppError('Invalid list ID', 400);
+  const pos = Number(position);
+  if (!Number.isFinite(pos)) throw new AppError('Invalid position', 400);
+
   const card = await getCardById(cardId, userId);
   const newList = await List.findById(listId).populate('board', 'workspace');
   if (!newList) throw new AppError('Target list not found', 404);
   const role = await getMemberRole(newList.board.workspace, userId);
-  if (!role || !['owner', 'admin'].includes(role)) {
-    throw new AppError('Insufficient permissions', 403);
+  if (!role) {
+    throw new AppError('Not a member of this workspace', 403);
   }
-  const originalListId = card.list.toString();
-  const session = await Card.db.startSession();
-  session.startTransaction();
-  try {
-    if (originalListId !== listId) {
-      await Card.updateMany(
-        { list: listId, position: { $gte: position } },
-        { $inc: { position: 1000 } },
-        { session }
-      );
-      card.list = listId;
-    } else {
-      const isMovingDown = position > card.position;
-      await Card.updateMany(
-        {
-          list: listId,
-          position: isMovingDown
-            ? { $gt: card.position, $lte: position }
-            : { $gte: position, $lt: card.position },
-        },
-        { $inc: { position: isMovingDown ? -1000 : 1000 } },
-        { session }
-      );
-    }
-    card.position = position;
-    await card.save({ session });
-    await session.commitTransaction();
-  } catch (e) {
-    await session.abortTransaction();
-    throw e;
-  } finally {
-    session.endSession();
+  // card.list may be a populated doc or an ObjectId — handle both.
+  const originalListId = card.list?._id ? String(card.list._id) : String(card.list);
+  if (originalListId !== listId) {
+    await Card.updateMany(
+      { list: listId, position: { $gte: pos } },
+      { $inc: { position: 1000 } }
+    );
+    card.list = listId;
+  } else if (pos !== card.position) {
+    const isMovingDown = pos > card.position;
+    await Card.updateMany(
+      {
+        list: listId,
+        position: isMovingDown
+          ? { $gt: card.position, $lte: pos }
+          : { $gte: pos, $lt: card.position },
+      },
+      { $inc: { position: isMovingDown ? -1000 : 1000 } }
+    );
   }
+  card.position = pos;
+  await card.save();
   await delCache(cacheKey('board', newList.board._id.toString(), '*'));
   if (originalListId !== listId) {
     const oldList = await List.findById(originalListId).select('board');

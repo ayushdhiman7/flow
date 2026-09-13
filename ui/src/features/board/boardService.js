@@ -1,4 +1,5 @@
-import { api, apiFetch } from "@/api/client";
+import { api } from "@/api/client";
+import { normId } from "@/lib/ids";
 
 export const boardService = {
   // Boards - workspace scoped
@@ -62,18 +63,23 @@ export const boardService = {
     return data;
   },
   async moveCard({ cardId, fromListId, toListId, position }) {
-    // PATCH /lists/:listId/cards/:id/move - spec says PATCH /cards/:id/move but actual mount is lists prefix
-    // Try patch via lists route first, fallback to generic /cards
-    try {
-      const data = await apiFetch(`/lists/${fromListId}/cards/${cardId}/move`, { method: "PATCH", body: { listId: toListId, position } });
-      return data.card || data;
-    } catch (e) {
-      if (e.status === 404) {
-        // try generic cards route
-        const data = await apiFetch(`/cards/${cardId}/move`, { method: "PATCH", body: { listId: toListId, position } });
-        return data.card || data;
-      }
-      throw e;
+    // Single canonical endpoint. IDs are pre-validated so a bad drag state
+    // surfaces as a clear client error instead of a backend 400 mystery.
+    const cId = normId(cardId);
+    const from = normId(fromListId);
+    const to = normId(toListId);
+    if (!cId || !from || !to) {
+      const err = new Error("Invalid board IDs for move");
+      err.status = 400;
+      throw err;
     }
+    const pos = Number(position);
+    if (!Number.isFinite(pos)) {
+      const err = new Error("Invalid position for move");
+      err.status = 400;
+      throw err;
+    }
+    const data = await api.patch(`/lists/${from}/cards/${cId}/move`, { listId: to, position: pos });
+    return data.card || data;
   },
 };

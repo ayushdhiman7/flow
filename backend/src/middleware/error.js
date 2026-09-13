@@ -21,7 +21,7 @@ export function errorHandler(err, req, res, next) {
   }
 
   if (err instanceof mongoose.Error.CastError) {
-    return res.status(400).json({ error: 'Invalid ID format' });
+    return res.status(400).json({ error: 'Invalid ID format', details: [{ field: err.path }] });
   }
 
   if (err.code === 11000) {

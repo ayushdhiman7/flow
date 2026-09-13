@@ -34,23 +34,23 @@ export default function BoardColumn({ list, onAddTask, onEditCard, onDeleteCard 
         className={`flex-1 overflow-auto px-2.5 pb-2 space-y-2.5 min-h-[160px] custom-scrollbar transition-colors duration-200 rounded-b-xl
           ${isOver ? "bg-zinc-50/80" : ""}`}
       >
-        {count === 0 ? (
-          <div className={`rounded-xl border-2 border-dashed py-10 text-center transition-all duration-200 ${isOver ? "border-zinc-900 bg-blue-50/50 scale-[1.01]" : "border-zinc-200 bg-white/60 hover:bg-white hover:border-zinc-300"}`}>
-            <div className={`mx-auto h-8 w-8 rounded-xl grid place-items-center mb-2 transition-colors ${isOver ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500"}`}>
-              <Plus className="h-4 w-4" />
+        <SortableContext id={list._id} items={(list.cards||[]).map(c=>c._id)} strategy={verticalListSortingStrategy}>
+          {count === 0 ? (
+            <div className={`rounded-xl border-2 border-dashed py-10 text-center transition-all duration-200 ${isOver ? "border-zinc-900 bg-blue-50/50 scale-[1.01]" : "border-zinc-200 bg-white/60 hover:bg-white hover:border-zinc-300"}`}>
+              <div className={`mx-auto h-8 w-8 rounded-xl grid place-items-center mb-2 transition-colors ${isOver ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500"}`}>
+                <Plus className="h-4 w-4" />
+              </div>
+              <p className={`text-xs font-semibold ${isOver ? "text-zinc-900" : "text-zinc-600"}`}>{isOver ? "Drop here" : "No tasks"}</p>
+              <p className="text-[11px] text-zinc-400 mt-1">{isOver ? "Release to add" : "Drag here or create one"}</p>
             </div>
-            <p className={`text-xs font-semibold ${isOver ? "text-zinc-900" : "text-zinc-600"}`}>{isOver ? "Drop here" : "No tasks"}</p>
-            <p className="text-[11px] text-zinc-400 mt-1">{isOver ? "Release to add" : "Drag here or create one"}</p>
-          </div>
-        ) : (
-          <SortableContext id={list._id} items={(list.cards||[]).map(c=>c._id)} strategy={verticalListSortingStrategy}>
+          ) : (
             <div className="space-y-2.5 py-1">
               {list.cards.map(card => (
                 <TaskCard key={card._id} card={card} onEdit={onEditCard} onDelete={onDeleteCard} />
               ))}
             </div>
-          </SortableContext>
-        )}
+          )}
+        </SortableContext>
 
         {isOver && count > 0 && (
           <div className="h-2 rounded-full bg-zinc-900/10 animate-pulse mt-1" />
