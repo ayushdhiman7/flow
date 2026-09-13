@@ -124,13 +124,15 @@ app.use(errorHandler);
 let server;
 
 export async function startServer() {
-  await connectDB();
-  await connectRedis();
-
+  // Bind the port FIRST so Render's health check/port binding passes even
+  // while downstream services are still connecting.
   server = app.listen(env.PORT, () => {
     logger.info(`Server running on port ${env.PORT}`);
     logger.info(`API docs: http://localhost:${env.PORT}/api-docs`);
   });
+
+  await connectDB(); // hard dependency: crash + restart if Mongo is unreachable
+  await connectRedis(); // soft dependency: never throws, app runs degraded
 
   initSocket(server);
   return server;
