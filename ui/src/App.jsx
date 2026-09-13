@@ -15,7 +15,7 @@ export default function App() {
   useEffect(() => {
     dispatch(initializeAuth());
     // cleanup legacy offline queue and PWA service worker (offline support removed)
-    try { localStorage.removeItem("flow_offline_queue"); } catch {}
+    try { localStorage.removeItem("flow_offline_queue"); } catch { /* storage unavailable */ }
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.getRegistrations?.().then(regs => regs.forEach(r => r.unregister()));
     }

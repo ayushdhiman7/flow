@@ -51,7 +51,7 @@ export default function SignInForm() {
           navigate("/dashboard", { replace: true });
           return;
         }
-      } catch {}
+      } catch { /* fall through to onboarding */ }
       navigate("/onboarding", { replace: true });
     }
   };

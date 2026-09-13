@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { selectUser } from "@/features/auth/authSelectors";
 import { setUser } from "@/features/auth/authSlice";
 import { authService } from "@/features/auth/authService";
-import { API_BASE } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
