@@ -21,7 +21,7 @@ A lightweight Notion/Trello/Slack-inspired SaaS built with modern tech stack.
 
 **DevOps**
 - Docker + Docker Compose (healthchecks, multi-stage)
-- `render.yaml` Blueprint for the API, `ui/vercel.json` SPA rewrites
+- `ui/vercel.json` SPA rewrites for React Router
 - GitHub Actions CI (lint → test → build)
 - Swagger/OpenAPI docs (`/api-docs`, `docs/openapi.yaml`)
 
@@ -101,7 +101,7 @@ VITE_API_URL=http://localhost:3000/api
 
 ## Deployment (Render + Vercel + Atlas)
 
-**Backend → Render** (Blueprint in `render.yaml`, or manual Web Service
+**Backend → Render** (manual Web Service
 with Root Directory `backend`, Build `npm ci`, Start `node src/app.js`):
 - `NODE_ENV=production`, `MONGO_URI` (Atlas SRV string), `REDIS_URL` (Upstash),
   `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` (32+ chars each),
@@ -249,7 +249,6 @@ flow/
 │   ├── architecture.md
 │   ├── er-diagram.md
 │   └── openapi.yaml
-├── render.yaml              # Render Blueprint (API)
 ├── docker-compose.yml       # mongo/redis/api/web with healthchecks
 └── .github/workflows/ci.yml # lint → test → build
 ```
