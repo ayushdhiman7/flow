@@ -6,7 +6,16 @@ if (isProd && !process.env.REDIS_URL) {
   logger.warn('REDIS_URL is not set — using localhost default which will fail on Render. Set REDIS_URL (e.g. Upstash rediss://) in the dashboard.');
 }
 
-export const redis = new Redis(env.REDIS_URL, {
+// Trim accidental whitespace/newlines from dashboard-pasted URLs.
+const redisUrl = String(env.REDIS_URL || '').trim();
+
+function redisErrorMessage(err) {
+  // ioredis wraps DNS/TLS failures in AggregateError — unwrap the real causes.
+  if (err?.errors?.length) return err.errors.map(e => e?.message || String(e)).join('; ');
+  return err?.message || String(err);
+}
+
+export const redis = new Redis(redisUrl, {
   maxRetriesPerRequest: null, // required when shared with BullMQ
   enableOfflineQueue: false, // fail fast while disconnected so cache helpers degrade instead of hanging
   lazyConnect: true,
@@ -17,7 +26,7 @@ export const redis = new Redis(env.REDIS_URL, {
 });
 
 redis.on('connect', () => logger.info('Redis connected'));
-redis.on('error', (err) => logger.error(`Redis error: ${err?.message || err}`));
+redis.on('error', (err) => logger.error(`Redis error: ${redisErrorMessage(err)}`));
 
 export async function connectRedis() {
   if (['connect', 'ready', 'connecting'].includes(redis.status)) return true;

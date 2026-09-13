@@ -7,7 +7,8 @@ let io;
 
 export function initSocket(server) {
   // CORS_ORIGIN may be a comma-separated list — socket.io needs an array.
-  const origins = String(env.CORS_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
+  // Strip trailing slashes to match the browser Origin header exactly.
+  const origins = String(env.CORS_ORIGIN || '').split(',').map(s => s.trim().replace(/\/+$/, '')).filter(Boolean);
   io = new Server(server, {
     cors: {
       origin: origins.length > 1 ? origins : (origins[0] || true),
