@@ -1,9 +1,9 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { selectSelectedWorkspaceId, selectSelectedWorkspace } from "@/features/workspace/workspaceSelectors";
 import { fetchWorkspaces } from "@/features/workspace/workspaceSlice";
 import { fetchNotes, createNote, updateNote, deleteNote } from "@/features/notes/notesSlice";
-import { selectNotes, selectNotesLoading, selectNotesSaving, selectNotesError } from "@/features/notes/notesSelectors";
+import { selectNotes, selectNotesLoading, selectNotesRefreshing, selectNotesSaving, selectNotesError } from "@/features/notes/notesSelectors";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ export default function NotesPage() {
   const workspace = useSelector(selectSelectedWorkspace);
   const notes = useSelector(selectNotes);
   const loading = useSelector(selectNotesLoading);
+  const refreshing = useSelector(selectNotesRefreshing);
   const saving = useSelector(selectNotesSaving);
   const error = useSelector(selectNotesError);
 
@@ -33,14 +34,20 @@ export default function NotesPage() {
   const [filterPinned, setFilterPinned] = useState(false);
 
   useEffect(()=>{ dispatch(fetchWorkspaces()); },[dispatch]);
-  useEffect(()=>{ if(workspaceId) dispatch(fetchNotes({workspaceId})); },[dispatch, workspaceId]);
-
-  // client-side search (already fetched); if backend supports search we refetch on debounced search
+  // Single fetch effect: immediate on mount/workspace change, debounced on
+  // search keystrokes. Previously two effects double-fetched on mount and
+  // every refetch swapped the grid for skeletons (the flicker).
+  const firstFetch = useRef(true);
   useEffect(()=>{
     if(!workspaceId) return;
+    const q = search.trim() || undefined;
+    if(firstFetch.current) {
+      firstFetch.current = false;
+      dispatch(fetchNotes({workspaceId, search: q}));
+      return;
+    }
     const t = setTimeout(()=>{
-      if(search.trim()) dispatch(fetchNotes({workspaceId, search: search.trim()}));
-      else dispatch(fetchNotes({workspaceId}));
+      dispatch(fetchNotes({workspaceId, search: q}));
     }, 400);
     return ()=>clearTimeout(t);
   },[search, workspaceId, dispatch]);
@@ -91,6 +98,7 @@ export default function NotesPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400"/>
           <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search notes..." className="pl-9 h-10 rounded-xl bg-white border-zinc-200"/>
+          {refreshing && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 animate-spin"/>}
         </div>
         <Button variant={filterPinned?"default":"outline"} onClick={()=>setFilterPinned(v=>!v)} className={`rounded-xl h-10 ${filterPinned?"bg-zinc-900 hover:bg-zinc-800":""}`}><Pin className={`h-4 w-4 ${filterPinned?"fill-white":""}`}/> Pinned only</Button>
       </div>

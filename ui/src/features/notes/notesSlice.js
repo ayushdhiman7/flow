@@ -43,11 +43,13 @@ const initialState = {
   items: [],
   selectedNote: null,
   loading: false,
+  refreshing: false,
   saving: false,
   deleting: false,
   error: null,
   initialized: false,
   workspaceId: null,
+  activeRequestId: null,
 };
 
 const notesSlice = createSlice({
@@ -59,9 +61,21 @@ const notesSlice = createSlice({
   },
   extraReducers: (b) => {
     b
-      .addCase(fetchNotes.pending, (s) => { s.loading = true; s.error = null; s.items = []; })
-      .addCase(fetchNotes.fulfilled, (s, a) => { s.loading = false; s.items = a.payload.notes; s.workspaceId = a.payload.workspaceId; s.initialized = true; })
-      .addCase(fetchNotes.rejected, (s, a) => { s.loading = false; s.error = a.payload?.message; s.initialized = true; })
+      .addCase(fetchNotes.pending, (s, a) => {
+        s.error = null;
+        s.activeRequestId = a.meta.requestId;
+        // Skeleton only on first-ever load; refetches keep the list mounted.
+        if (!s.initialized) { s.loading = true; s.items = []; }
+        else { s.refreshing = true; }
+      })
+      .addCase(fetchNotes.fulfilled, (s, a) => {
+        if (a.meta.requestId !== s.activeRequestId) return; // stale response
+        s.loading = false; s.refreshing = false; s.items = a.payload.notes; s.workspaceId = a.payload.workspaceId; s.initialized = true;
+      })
+      .addCase(fetchNotes.rejected, (s, a) => {
+        if (a.meta.requestId !== s.activeRequestId) return; // stale response
+        s.loading = false; s.refreshing = false; s.error = a.payload?.message; s.initialized = true;
+      })
 
       .addCase(createNote.pending, (s) => { s.saving = true; s.error = null; })
       .addCase(createNote.fulfilled, (s, a) => { s.saving = false; s.items.unshift(a.payload.note); })
