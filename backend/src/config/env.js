@@ -6,7 +6,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(3000),
   MONGO_URI: z.string().min(1).default('mongodb://localhost:27017/flow'),
-  REDIS_ENABLED: z.string().optional().transform(value => value === 'true').default(false),
+  REDIS_ENABLED: z.string().optional().transform(value => value === 'true').default('false'),
   REDIS_URL: z.string().optional(),
   JWT_ACCESS_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
