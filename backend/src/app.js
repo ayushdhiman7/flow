@@ -39,16 +39,9 @@ app.use(morgan(isTest ? 'tiny' : 'combined', {
 }));
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-// Normalize: trim whitespace AND trailing slashes so
-// "https://app.vercel.app/" still matches the browser Origin header.
-const stripSlash = (s) => s.replace(/\/+$/, '');
-const allowedOrigins = env.CORS_ORIGIN.split(",").map(s => stripSlash(s.trim())).filter(Boolean);
-logger.info(`CORS allowed origins: ${allowedOrigins.join(', ') || '(none — set CORS_ORIGIN)'}`);
+logger.info('CORS allows all origins');
 app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(stripSlash(origin))) return cb(null, true);
-    return cb(null, false);
-  },
+  origin: true,
   credentials: true,
 }));
 app.use(compression());
