@@ -1,12 +1,12 @@
 import { Queue, Worker } from 'bullmq';
 import { redis } from './redis.js';
-import { env } from './env.js';
 import { logger } from './logger.js';
 
-export const emailQueue = new Queue('email', { connection: redis });
-export const notificationQueue = new Queue('notifications', { connection: redis });
+export const emailQueue = redis ? new Queue('email', { connection: redis }) : null;
+export const notificationQueue = redis ? new Queue('notifications', { connection: redis }) : null;
 
 export async function addEmailJob(name, data) {
+  if (!emailQueue) return;
   try {
     await emailQueue.add(name, data, { attempts: 3, backoff: { type: 'exponential', delay: 1000 } });
   } catch (err) {
@@ -16,6 +16,7 @@ export async function addEmailJob(name, data) {
 }
 
 export async function addNotificationJob(name, data) {
+  if (!notificationQueue) return;
   try {
     await notificationQueue.add(name, data, { attempts: 3, backoff: { type: 'exponential', delay: 1000 } });
   } catch (err) {
@@ -25,6 +26,7 @@ export async function addNotificationJob(name, data) {
 }
 
 export function createWorker(queueName, processor) {
+  if (!redis) return null;
   return new Worker(queueName, processor, {
     connection: redis,
     concurrency: 5,
@@ -32,6 +34,5 @@ export function createWorker(queueName, processor) {
 }
 
 export async function closeQueues() {
-  await emailQueue.close();
-  await notificationQueue.close();
+  await Promise.all([emailQueue?.close(), notificationQueue?.close()]);
 }

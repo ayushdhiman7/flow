@@ -1,10 +1,6 @@
 import Redis from 'ioredis';
-import { env, isProd } from './env.js';
+import { env } from './env.js';
 import { logger } from './logger.js';
-
-if (isProd && !process.env.REDIS_URL) {
-  logger.warn('REDIS_URL is not set — using localhost default which will fail on Render. Set REDIS_URL (e.g. Upstash rediss://) in the dashboard.');
-}
 
 // Trim accidental whitespace/newlines from dashboard-pasted URLs.
 const redisUrl = String(env.REDIS_URL || '').trim();
@@ -15,7 +11,7 @@ function redisErrorMessage(err) {
   return err?.message || String(err);
 }
 
-export const redis = new Redis(redisUrl, {
+export const redis = env.REDIS_ENABLED ? new Redis(redisUrl, {
   maxRetriesPerRequest: null, // required when shared with BullMQ
   enableOfflineQueue: false, // fail fast while disconnected so cache helpers degrade instead of hanging
   lazyConnect: true,
@@ -23,12 +19,13 @@ export const redis = new Redis(redisUrl, {
     // capped exponential backoff: 200ms, 400ms, ... max 5s, retry forever
     return Math.min(times * 200, 5000);
   },
-});
+}) : null;
 
-redis.on('connect', () => logger.info('Redis connected'));
-redis.on('error', (err) => logger.error(`Redis error: ${redisErrorMessage(err)}`));
+redis?.on('connect', () => logger.info('Redis connected'));
+redis?.on('error', (err) => logger.error(`Redis error: ${redisErrorMessage(err)}`));
 
 export async function connectRedis() {
+  if (!redis) return false;
   if (['connect', 'ready', 'connecting'].includes(redis.status)) return true;
   try {
     // don't block boot forever: give Redis 10s, then run degraded (no cache/jobs)
@@ -44,6 +41,7 @@ export async function connectRedis() {
 }
 
 export async function disconnectRedis() {
+  if (!redis) return;
   if (['end', 'close'].includes(redis.status)) return;
   try {
     await redis.quit();
@@ -55,6 +53,7 @@ export function cacheKey(...parts) {
 }
 
 export async function getCache(key) {
+  if (!redis) return null;
   try {
     const v = await redis.get(key);
     return v ? JSON.parse(v) : null;
@@ -62,12 +61,14 @@ export async function getCache(key) {
 }
 
 export async function setCache(key, value, ttl = 300) {
+  if (!redis) return;
   try {
     await redis.set(key, JSON.stringify(value), 'EX', ttl);
   } catch {}
 }
 
 export async function delCache(pattern) {
+  if (!redis) return;
   try {
     let cursor = '0';
     do {

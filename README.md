@@ -6,7 +6,7 @@ A lightweight Notion/Trello/Slack-inspired SaaS built with modern tech stack.
 
 **Backend**
 - Express.js (ESM) + Mongoose
-- MongoDB Atlas + Redis (cache + BullMQ job queues)
+- MongoDB Atlas + optional Redis (cache + BullMQ job queues)
 - Socket.io for real-time
 - JWT Auth (httpOnly cookies: access + refresh tokens)
 - RBAC (Owner/Admin/Member, workspace-scoped)
@@ -64,8 +64,8 @@ docker compose up -d --wait
 ### Local Development
 
 ```bash
-# Terminal 1 - MongoDB & Redis
-docker compose up mongo redis -d
+# Terminal 1 - MongoDB
+docker compose up mongo -d
 
 # Terminal 2 - Backend
 cd backend
@@ -86,7 +86,9 @@ npm run dev            # http://localhost:5173
 NODE_ENV=development
 PORT=3000
 MONGO_URI=mongodb://localhost:27017/flow
-REDIS_URL=redis://localhost:6379
+# Optional: set REDIS_ENABLED=true and REDIS_URL to enable cache and background jobs.
+REDIS_ENABLED=false
+# REDIS_URL=redis://localhost:6379
 JWT_ACCESS_SECRET=your-super-secret-access-key-at-least-32-chars
 JWT_REFRESH_SECRET=your-super-secret-refresh-key-at-least-32-chars
 JWT_ACCESS_EXPIRY=15m
@@ -103,9 +105,10 @@ VITE_API_URL=http://localhost:3000/api
 
 **Backend → Render** (manual Web Service
 with Root Directory `backend`, Build `npm ci`, Start `node src/app.js`):
-- `NODE_ENV=production`, `MONGO_URI` (Atlas SRV string), `REDIS_URL` (Upstash),
+- `NODE_ENV=production`, `MONGO_URI` (Atlas SRV string),
   `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` (32+ chars each),
   `CORS_ORIGIN=https://<your-app>.vercel.app`
+- Redis is optional; leave `REDIS_ENABLED` unset (or `false`) on free instances.
 - Atlas → Network Access must allow Render (`0.0.0.0/0`; auth still via DB user)
 - The API serves `/health` for Render health checks and sets `trust proxy`
   for correct rate-limiting and secure cookies behind the proxy
@@ -215,7 +218,7 @@ const socket = io('https://<your-render-api>.onrender.com', {
 flow/
 ├── backend/
 │   ├── src/
-│   │   ├── config/          # DB, Redis, Queue, Logger, Env
+│   │   ├── config/          # DB, optional Redis/Queue, Logger, Env
 │   │   ├── middleware/      # Auth, RBAC, Audit, Error, Validate, Upload
 │   │   ├── modules/
 │   │   │   ├── auth/        # Auth + JWT cookies + sessions + avatar
@@ -249,7 +252,7 @@ flow/
 │   ├── architecture.md
 │   ├── er-diagram.md
 │   └── openapi.yaml
-├── docker-compose.yml       # mongo/redis/api/web with healthchecks
+├── docker-compose.yml       # mongo/api/web with healthchecks
 └── .github/workflows/ci.yml # lint → test → build
 ```
 
@@ -286,7 +289,8 @@ cd ui && npm run lint
 └─────────────┘     └──────┬──────┘     └─────────────┘
                            │
                     ┌──────┴──────┐
-                    │    Redis    │
+                    │ Optional   │
+                    │   Redis    │
                     │  Cache +    │
                     │  BullMQ     │
                     └──────┬──────┘
